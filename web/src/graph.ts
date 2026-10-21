@@ -592,6 +592,48 @@ export function project(snapshot: GraphSnapshot, mode: ViewMode, query: string, 
   return { nodes: flowNodes, edges: flowEdges, hidden: allNodes.length - nodes.length };
 }
 
+/**
+ * Stage-only teaching: the stage becomes a header card, its implementing units
+ * sit in a compact grid below. The one-to-many `implements` edges are redundant
+ * here (they would fan out from a single point), so the caller hides them; only
+ * real calls/data-flow between the units remain.
+ */
+export function layoutTeachingStage(nodes: CanvasNode[], edges: Edge[]): { nodes: CanvasNode[]; edges: Edge[] } {
+  const stage = nodes.find((node) => node.data.item.type === 'stage');
+  const units = nodes.filter((node) => node.data.item.type === 'unit');
+  const columns = units.length > 18 ? 4 : units.length > 9 ? 3 : units.length > 3 ? 2 : 1;
+  const gapX = TREE_GAP_X;
+  const gapY = TREE_GAP_Y;
+  const gridW = columns * NODE_W + (columns - 1) * gapX;
+  const stageW = Math.max(NODE_W, Math.min(360, gridW));
+  const stageX = Math.max(0, (gridW - stageW) / 2);
+  const stageH = NODE_H;
+  const laid = nodes.map((node) => {
+    if (node.data.item.type === 'stage') {
+      return {
+        ...node,
+        position: { x: stageX, y: 0 },
+        style: { ...node.style, width: stageW },
+        data: { ...node.data, direction: 'RIGHT' as const },
+      };
+    }
+    const index = units.findIndex((unit) => unit.id === node.id);
+    const column = Math.max(0, index) % columns;
+    const row = Math.floor(Math.max(0, index) / columns);
+    return {
+      ...node,
+      position: { x: column * (NODE_W + gapX), y: stageH + 48 + row * (heightOf(node) + gapY) },
+      data: { ...node.data, direction: 'RIGHT' as const },
+    };
+  });
+  // The stage→unit binding is represented by the header + count, not by 22
+  // crossing arrows. Keep only relations between the implementing units.
+  return {
+    nodes: laid,
+    edges: edges.filter((edge) => edgeKind(edge) !== 'implements'),
+  };
+}
+
 export async function layoutGraph(nodes: CanvasNode[], edges: Edge[], direction: 'RIGHT' | 'DOWN' = 'RIGHT', grouped = false, overviewColumns: 1 | 2 = 2, teaching: TeachingLayout | null = null) {
   if (!nodes.length) return { nodes, edges };
   if (grouped) return layoutOverview(nodes, edges, overviewColumns);
