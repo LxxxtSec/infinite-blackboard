@@ -54,7 +54,7 @@ export function TypeDot({ type, className }: { type: string; className?: string 
 const handleClass = 'size-1! min-h-0! min-w-0! border-0! bg-transparent! opacity-0! pointer-events-none!';
 
 export const SecurityNode = memo(function SecurityNode({ id, data, selected }: NodeProps<CanvasNode>) {
-  const { item, current, dimmed, direction, compact, muted, fresh } = data;
+  const { item, current, dimmed, direction, compact, muted, fresh, studyOrder } = data;
   const level = useStore((state) => detailLevel(state.transform[2]));
   const vertical = direction === 'DOWN';
   const updateNodeInternals = useUpdateNodeInternals();
@@ -88,6 +88,11 @@ export const SecurityNode = memo(function SecurityNode({ id, data, selected }: N
         fresh && 'fresh-pulse',
       )}
     >
+      {studyOrder && (
+        <span className="absolute right-2.5 top-2.5 z-10 rounded-full bg-node-stage/20 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-node-stage">
+          #{studyOrder}
+        </span>
+      )}
       <i aria-hidden className="absolute bottom-3 left-0 top-3 w-[3px] rounded-r-full bg-(--c)" />
       <Handle type="target" position={vertical ? Position.Top : Position.Left} className={handleClass} />
       {!overview && (

@@ -13,7 +13,7 @@ import { SecurityNode } from './SecurityNode';
 import { focusedIds, neighborInDirection, relatedIds, type ArrowKey } from './canvas-state';
 import { exportCanvasPng } from './export-image';
 import { RoutedEdge } from './RoutedEdge';
-import { currentNodeId, hasTeachingData, layoutGraph, layoutTeachingStage, NODE_H, NODE_W, orderedStages, project, typeLabel as typeLabelOf, type CanvasNode, type EdgeStyle, type RelationGroup, type TeachingLayout } from './graph';
+import { currentNodeId, hasTeachingData, layoutGraph, layoutTeachingStage, orderStageUnits, NODE_H, NODE_W, orderedStages, project, typeLabel as typeLabelOf, type CanvasNode, type EdgeStyle, type RelationGroup, type TeachingLayout } from './graph';
 import { EMPTY_FILTER, filterActive, filterNodes, lessonsForNode, type NodeFilter } from './presentation';
 import type { BoardNode, ViewMode } from './types';
 import { values } from './types';
@@ -149,7 +149,15 @@ function Workspace() {
     const nodes = base.nodes.filter((node) => unitIds.has(node.id));
     const ids = new Set(nodes.map((node) => node.id));
     const edges = base.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target) && (edge.data as { kind?: string } | undefined)?.kind !== 'implements');
-    return { ...base, nodes, edges, hidden: 0 };
+    const ordered = orderStageUnits(
+      nodes.filter((node) => node.data.item.type === 'unit').map((node) => node.data.item),
+      base.edges.map((edge) => ({ from: edge.source, to: edge.target, kind: String((edge.data as { kind?: string } | undefined)?.kind || '') })),
+    );
+    const orderById = new Map(ordered.map((unit, index) => [unit.id, index + 1]));
+    const withOrder = nodes.map((node) => node.data.item.type === 'unit'
+      ? { ...node, data: { ...node.data, studyOrder: orderById.get(node.id) } }
+      : node);
+    return { ...base, nodes: withOrder, edges, hidden: 0 };
   }, [snapshot, mode, teachingLayout, stageStudyId]);
 
   const allNodes = useMemo(() => (snapshot ? values(snapshot.nodes).filter((node) => node.status !== 'removed') : []), [snapshot]);
@@ -662,8 +670,11 @@ function Workspace() {
   const needsAnalysis = projectsMode && Number(stats.units || 0) > 0 && !analysisReady;
   const stageStudy = stageStudyId ? byId.get(stageStudyId) || null : null;
   const stageStudyUnits = stageStudy
-    ? allEdges.filter((edge) => edge.kind === 'implements' && edge.to === stageStudy.id)
-      .map((edge) => byId.get(edge.from)).filter((node): node is BoardNode => Boolean(node))
+    ? orderStageUnits(
+      allEdges.filter((edge) => edge.kind === 'implements' && edge.to === stageStudy.id)
+        .map((edge) => byId.get(edge.from)).filter((node): node is BoardNode => Boolean(node)),
+      allEdges,
+    )
     : [];
   const requestMacroNotes = (missing: BoardNode[]) => {
     if (!snapshot?.requestToken || isStatic || !missing.length) return;
@@ -739,6 +750,7 @@ function Workspace() {
                 teaching={teaching}
                 onOpenStudy={setStudyId}
                 onStudyStage={studyStage}
+                stageOrder={stageStudy ? stageStudyUnits : undefined}
               />
             </aside>
             <ResizeHandle side="left" width={sidebarWidth} min={220} max={480} defaultValue={264} onChange={setSidebarWidth} label="调整左侧导航宽度" />
@@ -848,10 +860,13 @@ function Workspace() {
           )}
 
           {stageStudy && (
-            <div className="pointer-events-auto absolute left-1/2 top-3 z-30 flex max-w-[92vw] -translate-x-1/2 items-center gap-2 overflow-hidden whitespace-nowrap rounded-full border border-strong bg-card px-3 py-1.5 text-[11.5px] shadow-float">
+            <div className="pointer-events-auto absolute left-1/2 top-14 z-30 flex max-w-[92vw] -translate-x-1/2 items-center gap-2 overflow-hidden whitespace-nowrap rounded-full border border-strong bg-card px-3 py-1.5 text-[11.5px] shadow-float">
               <span className="shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">阶段教学</span>
               <span className="min-w-0 max-w-[44vw] truncate font-medium" title={stageStudy.title}>{stageStudy.title}</span>
-              <span className="shrink-0 text-muted-foreground">{stageStudyUnits.length} 个函数</span>
+              <span className="shrink-0 text-muted-foreground">{stageStudyUnits.length} 个函数 · 先基础后入口</span>
+              {stageStudyUnits[0] && (
+                <button onClick={() => { setStudyId(stageStudyUnits[0].id); setSelectedId(stageStudyUnits[0].id); }} className="shrink-0 rounded-full bg-foreground px-2 py-0.5 text-[10.5px] text-background hover:opacity-90">从 #1 开始</button>
+              )}
               <button onClick={() => setSelectedId(stageStudyId)} className="shrink-0 rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong">详情</button>
               <button onClick={() => setStageStudyId(null)} className="shrink-0 rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong">退出</button>
             </div>

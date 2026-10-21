@@ -18,6 +18,7 @@ export type CanvasNodeData = Record<string, unknown> & {
   current: boolean;
   dimmed: boolean;
   degree: number;
+  studyOrder?: number;
   compact?: boolean;
   group?: boolean;
   muted?: boolean;
@@ -130,6 +131,41 @@ export function orderedStages(nodes: BoardNode[], edges: { from: string; to: str
   return result;
 }
 
+
+/**
+ * Suggested reading order for the functions of one exploit stage: callees
+ * first, callers/entry last (post-order DFS over call edges). This matches the
+ * board's "basic at the bottom/right" learning direction.
+ */
+export function orderStageUnits(units: BoardNode[], edges: { from: string; to: string; kind: string }[]): BoardNode[] {
+  const byId = new Map(units.map((unit) => [unit.id, unit]));
+  const next = new Map<string, string[]>();
+  const incoming = new Set<string>();
+  for (const edge of edges) {
+    if (edge.kind !== 'calls' || !byId.has(edge.from) || !byId.has(edge.to)) continue;
+    if (!next.has(edge.from)) next.set(edge.from, []);
+    next.get(edge.from)!.push(edge.to);
+    incoming.add(edge.to);
+  }
+  const byPosition = (a: BoardNode, b: BoardNode) => String(a.file || '').localeCompare(String(b.file || '')) || Number(a.startLine || 0) - Number(b.startLine || 0);
+  for (const list of next.values()) list.sort((a, b) => byPosition(byId.get(a)!, byId.get(b)!));
+  const roots = units.filter((unit) => !incoming.has(unit.id)).sort(byPosition);
+  const seen = new Set<string>();
+  const visiting = new Set<string>();
+  const order: BoardNode[] = [];
+  const visit = (id: string) => {
+    if (seen.has(id) || visiting.has(id)) return;
+    visiting.add(id);
+    for (const child of next.get(id) || []) visit(child);
+    visiting.delete(id);
+    seen.add(id);
+    const node = byId.get(id);
+    if (node) order.push(node);
+  };
+  for (const root of roots) visit(root.id);
+  for (const unit of [...units].sort(byPosition)) visit(unit.id);
+  return order;
+}
 
 export type TeachingLayout = 'hierarchy' | 'chain' | 'files';
 

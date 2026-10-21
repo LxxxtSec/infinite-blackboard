@@ -37,9 +37,10 @@ type Props = {
   teaching?: TeachingSection | null;
   onOpenStudy?: (id: string) => void;
   onStudyStage?: (id: string) => void;
+  stageOrder?: BoardNode[];
 };
 
-export function Sidebar({ current, openItems, findings, inbox, selectedId, counts, onSelect, onSearch, onShortcuts, filter, onFilter, filterOptions, results, teaching, onOpenStudy, onStudyStage }: Props) {
+export function Sidebar({ current, openItems, findings, inbox, selectedId, counts, onSelect, onSearch, onShortcuts, filter, onFilter, filterOptions, results, teaching, onOpenStudy, onStudyStage, stageOrder }: Props) {
   const answered = new Set((teaching?.answers || []).map((reply) => reply.requestId));
   const openRequests = (teaching?.requests || []).filter((request) => !answered.has(request.id));
   return (
@@ -81,6 +82,21 @@ export function Sidebar({ current, openItems, findings, inbox, selectedId, count
                   <span className="truncate font-mono text-foreground" title={dep.to}>{dep.to.split('/').pop()}</span>
                   {dep.kind === 'calls' && <span className="ml-auto tabular-nums">×{dep.count}</span>}
                 </div>
+              ))}
+            </Section>
+          )}
+
+          {stageOrder && stageOrder.length > 0 && (
+            <Section title="本阶段学习顺序" count={stageOrder.length} defaultOpen>
+              {stageOrder.map((unit, index) => (
+                <Row
+                  key={unit.id}
+                  node={unit}
+                  selected={selectedId === unit.id}
+                  onSelect={onSelect}
+                  onOpenStudy={onOpenStudy}
+                  subtitle={`#${index + 1} · ${unit.role ? unit.role.slice(0, 24) : unit.file ? `${unit.file.split('/').pop()}:${unit.startLine}` : '函数'}`}
+                />
               ))}
             </Section>
           )}
