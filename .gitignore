@@ -27,3 +27,8 @@ id_ed25519*
 
 # Local playground projects (one board per subdirectory)
 projects/
+
+# Desktop packaging output
+.desktop-dist/
+desktop/dist/
+.npm-cache/

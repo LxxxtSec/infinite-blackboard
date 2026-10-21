@@ -114,6 +114,19 @@ blackboard lint        # 孤立节点、缺证据的结论、日志损坏等提�
 - `blackboard lint` 只报告上下文质量，永远以退出状态 0 返回；
 - Hook 只是可选的恢复辅助（会话开始注入 Digest、压缩前存检查点）；原始活动采集需要显式加 `--with-activity`。正常使用不依赖 Hook。
 
+## 桌面版
+
+仓库包含一个最小 Electron 外壳（`desktop/`），不重写现有 Web/服务，只负责启动、窗口、托盘和退出清理：
+
+```bash
+npm install
+npm run desktop:dev     # 开发运行
+npm run desktop:pack    # 目录版，先验证
+npm run desktop:dist    # 生成安装包（macOS: dmg/zip）
+```
+
+数据默认仍在 `~/blackboard-projects`；Agent 仍使用本机 `claude` / `codex` / `pi` 等 CLI。
+
 ## 隐私与数据
 
 - 仓库**不包含**任何 API key、Agent 登录态或项目数据；

@@ -1,0 +1,29 @@
+appId: com.lxxxtsec.infiniteblackboard
+productName: Infinite Blackboard
+copyright: Copyright © 2026 Infinite Blackboard contributors
+directories:
+  output: desktop/dist
+  buildResources: desktop/assets
+files:
+  - desktop/main.cjs
+  - desktop/assets/**/*
+  - lib/**/*
+  - bin/**/*
+  - public/**/*
+  - package.json
+  - '!node_modules/**'
+asar: false
+npmRebuild: false
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.developer-tools
+  icon: desktop/assets/icon.png
+win:
+  target: nsis
+  icon: desktop/assets/icon.png
+linux:
+  target: AppImage
+  category: Development
+  icon: desktop/assets/icon.png
