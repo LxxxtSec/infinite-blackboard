@@ -1,6 +1,7 @@
 appId: com.lxxxtsec.infiniteblackboard
 productName: Infinite Blackboard
 copyright: Copyright © 2026 Infinite Blackboard contributors
+afterPack: desktop/after-pack.cjs
 directories:
   output: desktop/dist
   buildResources: desktop/assets
