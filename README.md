@@ -114,6 +114,16 @@ blackboard lint        # 孤立节点、缺证据的结论、日志损坏等提�
 - `blackboard lint` 只报告上下文质量，永远以退出状态 0 返回；
 - Hook 只是可选的恢复辅助（会话开始注入 Digest、压缩前存检查点）；原始活动采集需要显式加 `--with-activity`。正常使用不依赖 Hook。
 
+## 隐私与数据
+
+- 仓库**不包含**任何 API key、Agent 登录态或项目数据；
+- Agent 的模型/CLI 设置存在本机 `<项目>/.flow/agent.json`（`.flow/` 已被 `.gitignore` 忽略）；
+- 实际项目数据默认在 `~/blackboard-projects`，可用 `BLACKBOARD_PROJECTS` 改位置；
+- 服务默认只监听 `127.0.0.1`，写接口需要进程内 token；**不要把它直接暴露到公网**；
+- 本地 CLI 模式和本地路径导入属于本机信任操作，只应在自己的机器上使用。
+
+如果误提交了密钥：先 revoke/rotate，再用 `git filter-repo` 清历史；只删文件不够。
+
 ## 一键启动 / 关闭
 
 macOS 下直接双击仓库根目录的：

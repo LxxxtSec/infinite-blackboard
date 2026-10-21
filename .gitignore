@@ -14,3 +14,16 @@ flow.html
 # Local editor and agent settings
 .claude/settings.local.json
 *.log
+
+# Never commit local credentials or private keys
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+id_rsa*
+id_ed25519*
+
+# Local playground projects (one board per subdirectory)
+projects/
