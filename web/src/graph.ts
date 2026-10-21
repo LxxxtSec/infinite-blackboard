@@ -635,39 +635,83 @@ export function project(snapshot: GraphSnapshot, mode: ViewMode, query: string, 
  * real calls/data-flow between the units remain.
  */
 export function layoutTeachingStage(nodes: CanvasNode[], edges: Edge[]): { nodes: CanvasNode[]; edges: Edge[] } {
+  const byId = new Map(nodes.map((node) => [node.id, node]));
   const stage = nodes.find((node) => node.data.item.type === 'stage');
   const units = nodes.filter((node) => node.data.item.type === 'unit');
-  const columns = units.length > 18 ? 4 : units.length > 9 ? 3 : units.length > 3 ? 2 : 1;
+  const unitIds = new Set(units.map((unit) => unit.id));
+  const calls = edges.filter((edge) => edgeKind(edge) === 'calls' && unitIds.has(edge.source) && unitIds.has(edge.target));
+
+  // Call depth from roots: callers in earlier (left) columns, callees later
+  // (right), so every call edge points rightward like the global hierarchy.
+  const depth = new Map(units.map((unit) => [unit.id, 0]));
+  for (let round = 0; round < units.length; round += 1) {
+    let changed = false;
+    for (const edge of calls) {
+      const next = Math.min(units.length, (depth.get(edge.source) || 0) + 1);
+      if ((depth.get(edge.target) || 0) < next) {
+        depth.set(edge.target, next);
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  const orderOf = (id: string) => {
+    const node = byId.get(id)!;
+    return [String(node.data.item.file || ''), Number(node.data.item.startLine || 0)];
+  };
+  const layers = new Map<number, CanvasNode[]>();
+  for (const unit of units) {
+    const level = depth.get(unit.id) || 0;
+    if (!layers.has(level)) layers.set(level, []);
+    layers.get(level)!.push(unit);
+  }
+  for (const list of layers.values()) {
+    list.sort((a, b) => {
+      const [af, al] = orderOf(a.id);
+      const [bf, bl] = orderOf(b.id);
+      return String(af).localeCompare(String(bf)) || Number(al) - Number(bl);
+    });
+  }
+
   const gapX = TREE_GAP_X;
   const gapY = TREE_GAP_Y;
-  const gridW = columns * NODE_W + (columns - 1) * gapX;
-  // A two-column-wide header reads as the parent of the grid without becoming
-  // a full-width banner that dwarfs the function cards.
+  const MAX_ROWS = 5;
+  const stageH = NODE_H;
+  const top = stageH + 48;
+  const positions = new Map<string, { x: number; y: number }>();
+  let baseX = 0;
+  let maxY = top;
+  for (const level of [...layers.keys()].sort((a, b) => a - b)) {
+    const list = layers.get(level)!;
+    const columns = Math.ceil(list.length / MAX_ROWS);
+    list.forEach((unit, index) => {
+      const column = Math.floor(index / MAX_ROWS);
+      const row = index % MAX_ROWS;
+      positions.set(unit.id, {
+        x: baseX + column * (NODE_W + gapX),
+        y: top + row * (heightOf(unit) + gapY),
+      });
+      maxY = Math.max(maxY, top + row * (heightOf(unit) + gapY));
+    });
+    baseX += columns * (NODE_W + gapX) + gapX;
+  }
+  const gridW = Math.max(NODE_W, baseX - gapX);
   const stageW = Math.max(NODE_W, Math.min(gridW, NODE_W * 2 + gapX));
   const stageX = Math.max(0, (gridW - stageW) / 2);
-  const stageH = NODE_H;
-  const laid = nodes.map((node) => {
-    if (node.data.item.type === 'stage') {
+  if (stage) positions.set(stage.id, { x: stageX, y: 0 });
+
+  return {
+    nodes: nodes.map((node) => {
+      const position = positions.get(node.id) || { x: 0, y: 0 };
       return {
         ...node,
-        position: { x: stageX, y: 0 },
-        style: { ...node.style, width: stageW },
+        position,
+        style: node.data.item.type === 'stage' ? { ...node.style, width: stageW } : node.style,
         data: { ...node.data, direction: 'RIGHT' as const },
       };
-    }
-    const index = units.findIndex((unit) => unit.id === node.id);
-    const column = Math.max(0, index) % columns;
-    const row = Math.floor(Math.max(0, index) / columns);
-    return {
-      ...node,
-      position: { x: column * (NODE_W + gapX), y: stageH + 48 + row * (heightOf(node) + gapY) },
-      data: { ...node.data, direction: 'RIGHT' as const },
-    };
-  });
-  // The stage→unit binding is represented by the header + count, not by 22
-  // crossing arrows. Keep only relations between the implementing units.
-  return {
-    nodes: laid,
+    }),
+    // The stage→unit binding is represented by the header + count, not by 22
+    // crossing arrows. Keep only relations between the implementing units.
     edges: edges.filter((edge) => edgeKind(edge) !== 'implements'),
   };
 }
