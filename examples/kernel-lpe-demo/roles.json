@@ -1,0 +1,26 @@
+{
+  "trigger_race": "触发：多线程反复 ioctl，把 refcount 竞态窗口打出来",
+  "keep_freed_object_handle": "原语：对象已释放但设备句柄仍有效，形成 UAF 读写入口",
+  "leak_kernel_pointer": "泄露：从悬垂对象读回字段，换算内核基址",
+  "compute_kernel_base": "换算：用虚构的固定偏移把泄露值变成内核基址",
+  "spray_msg": "堆布局：用消息对象占据刚释放的槽位（示例只做占位）",
+  "heap_spray": "辅助：按对象大小批量填充受控内容",
+  "net_notify": "辅助：把喷洒结果通过本地 socket 发出去（示例无实际效果）",
+  "vuln_demo.c:vuln_free": "漏洞本体：锁外递减 refcount，释放后没有清空 slot 指针",
+  "vuln_demo.c:VULN_IOC_ALLOC": {
+    "role": "虚构驱动的“分配对象” ioctl 命令号",
+    "detail": "来源：vuln_demo.c 顶部手写的 ABI。真实设备要按厂商 ioctl 表或内核头文件核对，命令号/方向位不同会直接打偏。"
+  },
+  "vuln_demo.c:VULN_IOC_READ": {
+    "role": "虚构驱动的“读对象字段” ioctl 命令号，是泄露阶段的入口",
+    "detail": "来源：vuln_demo.c 的 ABI 定义；配合 vuln_read 的 copy_to_user 使用，示例只演示语义。"
+  },
+  "exploit.c:SPRAY_COUNT": {
+    "role": "喷洒轮数：决定用多少个消息对象去占据释放槽位",
+    "detail": "来源：exploit.c 顶部的示例常量。真实利用要按对象大小和 slab 布局调参，不是固定 256。"
+  },
+  "vuln_demo.c:VULN_MAX": {
+    "role": "虚构驱动允许的最大对象槽位",
+    "detail": "来源：vuln_demo.c 的驱动状态数组大小；示例用它限制分配数量。"
+  }
+}

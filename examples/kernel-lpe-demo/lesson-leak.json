@@ -1,0 +1,43 @@
+{
+  "schema": "blackboard.lesson.v1",
+  "level": "line",
+  "title": "逐行读 leak_kernel_pointer：把悬垂读变成内核地址",
+  "difficulty": "advanced",
+  "skill": { "name": "kernel-lpe-teach", "version": "0.1.0" },
+  "target": {
+    "file": "exploit.c",
+    "lines": [{ "start": 114, "end": 120 }]
+  },
+  "summary": "泄露函数只有六行，但它决定了后面所有阶段能不能落地。重点看：读的是什么、失败时返回什么、泄露值如何变成基址。",
+  "sections": [
+    {
+      "heading": "这六行在做什么",
+      "body": "`out` 是用户态缓冲区；`ioctl(dev_fd, VULN_IOC_READ, &out)` 让驱动把“对象里的字段”复制回用户态。因为对象已经释放（上一阶段），读到的可能是被喷洒对象覆盖后的内容，里面常含有内核指针。\n\n拿到指针不等于拿到基址：`compute_kernel_base()` 用一个**虚构的固定偏移**演示换算，真实目标需要先确认符号与偏移。",
+      "refs": ["exploit.c:114-130"]
+    },
+    {
+      "heading": "失败路径为什么重要",
+      "body": "第 117-118 行在 ioctl 失败时直接返回 0，调用方把 0 当作“没有泄露”。这在真实利用里是常见坑：竞态没打中、对象已被复用、缓解措施触发，都会让泄露失败；继续往下走只会让后续阶段在错误基址上崩溃。",
+      "refs": ["exploit.c:122-130"]
+    },
+    {
+      "heading": "从泄露到基址要验证什么",
+      "body": "1. 泄露值的形态：是否像内核指针（高字节、对齐、范围）；\n2. 偏移来源：符号表、vmlinux、/proc/kallsyms 或已知 gadget；\n3. 稳定性：多次泄露是否一致，是否受 KASLR 滑动影响；\n4. 失败回滚：泄露失败时不要把后续阶段的状态改坏。",
+      "refs": []
+    }
+  ],
+  "lineNotes": [
+    { "file": "exploit.c", "line": 116, "kind": "note", "note": "用户态输出缓冲区，驱动会把对象字段复制到这里。" },
+    { "file": "exploit.c", "line": 117, "kind": "key", "note": "核心调用：读的是已释放对象的字段，属于 UAF 读原语。" },
+    { "file": "exploit.c", "line": 118, "kind": "danger", "note": "失败时返回 0；调用方若把 0 当有效地址，后续会崩在错误基址上。" },
+    { "file": "exploit.c", "line": 119, "kind": "note", "note": "正常路径把泄露值交给 compute_kernel_base 做偏移换算。" }
+  ],
+  "concepts": [
+    { "term": "信息泄露原语", "explain": "能从内核读回受保护地址的 bug，常见于越界读、未初始化栈、UAF 读。" },
+    { "term": "KASLR slide", "explain": "内核镜像加载基址的随机偏移；泄露一个符号地址后按已知偏移即可推出 slide。" }
+  ],
+  "prerequisites": ["理解 UAF 原语", "知道 KASLR 与符号偏移"],
+  "exercises": [
+    { "prompt": "如果 ioctl 失败但 out 仍保留上次的值，这段代码会有什么问题？", "answer": "会把旧值当成本次泄露，导致基址错误且难以发现；应清零并在失败时显式返回错误。" }
+  ]
+}

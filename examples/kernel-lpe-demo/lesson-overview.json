@@ -1,0 +1,48 @@
+{
+  "schema": "blackboard.lesson.v1",
+  "level": "overview",
+  "title": "从竞态到 root：这条 Android 内核 LPE 链的整体形状",
+  "difficulty": "advanced",
+  "skill": { "name": "kernel-lpe-teach", "version": "0.1.0" },
+  "target": { "board": true },
+  "summary": "这不是一份可以直接打真机的 exp。示例代码只面向一个虚构的 `/dev/vuln_demo` 驱动，目的是把**内核 LPE 的通用结构**摊开：先把漏洞变成一个可控原语，再把原语变成提权，最后选择落地方式。先看懂每一阶段需要什么证据，再去看代码。",
+  "sections": [
+    {
+      "heading": "一、这条链在解决什么问题",
+      "body": "内核提权和用户态漏洞最大的区别是：你无法直接调用内核函数，也无法直接读写内核内存。所以一条完整链路必须依次回答四个问题：\n\n1. **怎么进入内核**：哪个系统调用 / ioctl / 协议路径能触达有 bug 的代码？\n2. **怎么把 bug 变成原语**：UAF、越界写、double free 之后，攻击者能稳定地读到或写到什么？\n3. **怎么绕过缓解**：KASLR 让地址随机化，SMEP/SMAP/PAN 限制执行与访问，CFI 限制函数指针。\n4. **怎么完成提权**：改 cred、改函数指针、改 modprobe_path，还是别的落地点？",
+      "refs": ["exploit.c:57-70", "exploit.c:90-100"]
+    },
+    {
+      "heading": "二、示例链的五个阶段",
+      "body": "对照黑板里的攻击链：\n\n- **入口**：`main()` 按顺序调用各阶段，失败即退出。\n- **攻击面**：`vuln_alloc` / `vuln_free` 把 ioctl 包装成可读的函数，是用户态唯一能碰到的接口。\n- **触发**：`trigger_race()` 起多个线程反复 ioctl，制造 refcount 竞态。\n- **原语**：`keep_freed_object_handle()` 释放对象后仍保留 fd，后续读写落到已释放内存。\n- **泄露**：`leak_kernel_pointer()` 读回被释放对象里的字段，用于推算内核基址。\n- **覆写 / 提权 / 影响**：示例只写了标记和注释，真实利用要在这里接 ROP 或数据篡改。",
+      "refs": ["exploit.c:90-100", "exploit.c:103-110", "exploit.c:114-120"]
+    },
+    {
+      "heading": "三、漏洞本体在驱动里",
+      "body": "回到 `vuln_demo.c` 的 `vuln_free()`：refcount 的检查与递减发生在锁外（注释标了 BUG），并且 `kfree()` 之后 slot 仍保留指针。两者叠加，用户态就得到一个**悬垂句柄**：对象已经释放，但设备仍认为它有效。\n\n学习时先只看驱动，回答两个问题：\n\n- 如果两个线程同时走到 `refcnt--`，会发生什么？\n- 为什么 `kfree()` 之后还要把 `slots[slot]` 置空？示例里置空了吗？",
+      "refs": ["vuln_demo.c:69-86"]
+    },
+    {
+      "heading": "四、真实世界还差什么",
+      "body": "示例刻意省略了真实利用所需的部分，学习时要能自己列出来：\n\n- 目标内核版本、符号偏移、结构体布局（不同 Android 厂商差异很大）；\n- 堆布局：`msg_msg`、`pipe_buffer`、`sk_buff` 等对象的大小与生命周期；\n- KASLR 泄露后的基址校验；SMEP/SMAP/PAN/CFI 对执行流的影响；\n- SELinux 域与 `commit_creds` 之后的上下文；\n- 稳定性：竞态窗口、CPU 绑定、失败回滚。",
+      "refs": []
+    }
+  ],
+  "concepts": [
+    { "term": "UAF（use-after-free）", "explain": "对象释放后仍被引用。内核里通常靠竞态或引用计数错误制造，攻击者随后用堆喷洒占据同一块内存。" },
+    { "term": "refcount 竞态", "explain": "引用计数的“检查—递减”不是原子操作，两个线程可能同时通过检查，导致对象被提前释放。" },
+    { "term": "KASLR", "explain": "内核地址随机化。需要先泄露一个内核指针，再按已知偏移推出符号地址。" },
+    { "term": "modprobe_path", "explain": "内核执行未知格式二进制时调用的路径。可写时是常见的持久化/提权落地点。" },
+    { "term": "SELinux", "explain": "即使拿到 root，受 SELinux 域限制也可能无法操作目标资源；很多链需要在提权后切换域。" }
+  ],
+  "prerequisites": [
+    "C 语言与 Linux 系统调用基础（ioctl、mmap、线程）",
+    "能读懂内核模块的 copy_from_user / mutex / kfree",
+    "知道 KASLR、SMEP、SMAP、CFI 大致是什么"
+  ],
+  "exercises": [
+    { "prompt": "为什么 `vuln_free()` 里 refcount 的检查必须放在锁内？请用两个线程的执行顺序说明。", "answer": "两个线程都可能读到 refcnt==1 并通过判断，随后各自递减；对象被释放两次或释放后仍被使用。" },
+    { "prompt": "如果 `kfree()` 后 slot 被置空，攻击者还能通过什么方式保留悬垂句柄？", "answer": "示例中置空发生在释放之后、锁内；真实漏洞常见于置空遗漏、其他引用路径（文件私有数据、链表）或释放前已拷贝出的指针。" },
+    { "prompt": "为什么泄露阶段通常发生在覆写阶段之前？", "answer": "覆写通常需要知道目标地址（内核基址 + 符号偏移），而地址需要先泄露；否则只能盲写。" }
+  ]
+}

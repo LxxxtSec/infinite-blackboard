@@ -1,0 +1,45 @@
+{
+  "stages": [
+    {
+      "title": "确认攻击面：虚构 ioctl 驱动",
+      "phase": "recon",
+      "units": [
+        "exploit.c:vuln_alloc",
+        "vuln_demo.c:vuln_free"
+      ],
+      "detail": "这条链由 Agent 分析示例代码后自定义，标题和阶段都不是固定模板。"
+    },
+    {
+      "title": "触发竞态：反复分配与释放",
+      "phase": "race-window",
+      "units": [
+        "trigger_race",
+        "race_worker"
+      ]
+    },
+    {
+      "title": "拿到悬垂句柄：UAF 原语",
+      "phase": "uaf-primitive",
+      "units": [
+        "keep_freed_object_handle"
+      ]
+    },
+    {
+      "title": "泄露内核地址：悬垂读",
+      "phase": "infoleak",
+      "units": [
+        "leak_kernel_pointer",
+        "compute_kernel_base"
+      ]
+    },
+    {
+      "title": "堆布局：占据释放槽位（示例到此为止）",
+      "phase": "heap-groom",
+      "units": [
+        "spray_msg",
+        "heap_prepare",
+        "heap_spray"
+      ]
+    }
+  ]
+}

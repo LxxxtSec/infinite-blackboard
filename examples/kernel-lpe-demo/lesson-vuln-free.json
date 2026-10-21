@@ -1,0 +1,46 @@
+{
+  "schema": "blackboard.lesson.v1",
+  "level": "line",
+  "title": "逐行读 vuln_free：一个 refcount 竞态 + 悬垂指针",
+  "difficulty": "advanced",
+  "skill": { "name": "kernel-lpe-teach", "version": "0.1.0" },
+  "target": {
+    "file": "vuln_demo.c",
+    "lines": [{ "start": 69, "end": 86 }]
+  },
+  "summary": "只读这一个函数。先分清“锁保护了什么”，再找出“锁没保护什么”，最后看释放后的指针有没有被清理。",
+  "sections": [
+    {
+      "heading": "阅读顺序",
+      "body": "1. 先看第 73 行的 `mutex_lock`，确认临界区从哪里开始。\n2. 看第 80 行的判断：`refcnt-- == 0` 是“先比较、后递减”，这个操作本身不是原子的。\n3. 看第 81-82 行：释放对象、置空 slot，两步之间没有其他同步。\n4. 回看第 74 行：空指针检查在锁内，但对象可能在检查之后、使用之前被其他线程释放。",
+      "refs": ["vuln_demo.c:69-86"]
+    },
+    {
+      "heading": "它为什么可被利用",
+      "body": "`refcnt` 属于被锁保护的结构体，但递减发生在锁内并不代表安全：关键在**判断与递减之间**是否存在窗口，以及**调用者是否仍持有对象引用**。示例里 `vuln_alloc()` 创建对象、`vuln_free()` 释放对象，而设备的 slot 数组没有在释放时同步清空（示例中置空发生在 kfree 之后、同一临界区里，真实漏洞常见的是漏掉这一步）。\n\n利用视角：拿到一个已释放但设备仍可读写的对象，就得到了 UAF 原语；接下来用堆喷洒占据同一块内存。",
+      "refs": ["vuln_demo.c:40-46", "vuln_demo.c:48-67", "vuln_demo.c:69-86"]
+    },
+    {
+      "heading": "如果让你修",
+      "body": "- 用 `refcount_t` 的 `refcount_dec_and_test()`，把最后一次引用释放交给原子引用计数；\n- 在释放路径里先摘链（从 slot 数组移除）再 `kfree`，避免释放后仍可被查表；\n- 检查对象是否仍被其他路径引用（文件私有数据、等待队列、异步回调）。",
+      "refs": []
+    }
+  ],
+  "lineNotes": [
+    { "file": "vuln_demo.c", "line": 73, "kind": "key", "note": "临界区起点：锁保护了 slot 查找与释放，但不保护“对象是否还被别人引用”。" },
+    { "file": "vuln_demo.c", "line": 74, "kind": "check", "note": "空指针检查在锁内，但通过检查不代表对象不会被并发释放。" },
+    { "file": "vuln_demo.c", "line": 80, "kind": "danger", "note": "核心问题：refcnt-- == 0 是一次非原子的读—改—写；两个线程可能都通过。" },
+    { "file": "vuln_demo.c", "line": 81, "kind": "danger", "note": "释放对象；若其他线程/路径还持有指针，这里就是 UAF 的起点。" },
+    { "file": "vuln_demo.c", "line": 82, "kind": "note", "note": "置空发生在释放之后。真实漏洞常漏掉这步或漏掉其他引用路径。" },
+    { "file": "vuln_demo.c", "line": 84, "kind": "note", "note": "解锁。注意：锁只覆盖本函数，不覆盖调用者手里的对象生命周期。" }
+  ],
+  "concepts": [
+    { "term": "临界区", "explain": "被锁保护的代码范围。锁只保证互斥，不保证被保护对象在锁外不被引用。" },
+    { "term": "refcount_t", "explain": "内核提供的原子引用计数类型，带溢出和 use-after-free 检查，优先于裸 int。" }
+  ],
+  "prerequisites": ["了解 mutex 的加锁/解锁范围", "知道 kfree 之后内存可能被重新分配"],
+  "exercises": [
+    { "prompt": "把第 80 行改成 `if (--st->slots[slot]->refcnt == 0)` 能修好吗？", "answer": "不能。递减仍然是普通内存操作，竞态窗口只是移动了位置；应使用 refcount_dec_and_test 这类原子原语。" },
+    { "prompt": "如果对象在释放前从 slot 数组摘除，攻击者的悬垂句柄还能来自哪里？", "answer": "来自此前已经拷贝出去的指针（文件私有数据、回调参数、异步工作项等），或者来自未加锁的其他查表路径。" }
+  ]
+}
