@@ -13,7 +13,7 @@ import { SecurityNode } from './SecurityNode';
 import { focusedIds, neighborInDirection, relatedIds, type ArrowKey } from './canvas-state';
 import { exportCanvasPng } from './export-image';
 import { RoutedEdge } from './RoutedEdge';
-import { currentNodeId, hasTeachingData, layoutGraph, layoutTeachingChain, NODE_H, NODE_W, orderedStages, project, typeLabel as typeLabelOf, type CanvasNode, type EdgeStyle, type RelationGroup, type TeachingLayout } from './graph';
+import { currentNodeId, hasTeachingData, layoutGraph, layoutTeachingStage, NODE_H, NODE_W, orderedStages, project, typeLabel as typeLabelOf, type CanvasNode, type EdgeStyle, type RelationGroup, type TeachingLayout } from './graph';
 import { EMPTY_FILTER, filterActive, filterNodes, lessonsForNode, type NodeFilter } from './presentation';
 import type { BoardNode, ViewMode } from './types';
 import { values } from './types';
@@ -148,7 +148,7 @@ function Workspace() {
     unitIds.add(stageStudyId);
     const nodes = base.nodes.filter((node) => unitIds.has(node.id));
     const ids = new Set(nodes.map((node) => node.id));
-    const edges = base.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target));
+    const edges = base.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target) && (edge.data as { kind?: string } | undefined)?.kind !== 'implements');
     return { ...base, nodes, edges, hidden: 0 };
   }, [snapshot, mode, teachingLayout, stageStudyId]);
 
@@ -448,7 +448,10 @@ function Workspace() {
     const stage = byId.get(id);
     if (!stage || stage.type !== 'stage') return;
     setStageStudyId(id);
-    setSelectedId(id);
+    // Do not auto-open Inspector: the stage banner carries the title/count and
+    // the grid should stay visible instead of being covered by a side panel.
+    setSelectedId(null);
+    setStudyId(null);
     setLockId(null);
     setMode('teaching');
   }, [byId]);
@@ -494,8 +497,8 @@ function Workspace() {
 
   const selectFromSidebar = useCallback((id: string) => {
     const node = byId.get(id);
+    if (node?.type === 'stage') { studyStage(id); return; }
     if (node?.type === 'unit') setStudyId(id);
-    if (node?.type === 'stage') studyStage(id);
     focusNode(id);
   }, [byId, focusNode, studyStage]);
 
@@ -515,7 +518,7 @@ function Workspace() {
     }
     let cancelled = false;
     const work = stageStudyId
-      ? Promise.resolve(layoutTeachingChain(projection.nodes, projection.edges))
+      ? Promise.resolve(layoutTeachingStage(projection.nodes, projection.edges))
       : layoutGraph(projection.nodes, projection.edges, direction, mode === 'all', overviewColumns, mode === 'teaching' ? teachingLayout : null);
     work.then((layouted) => {
       if (cancelled) return;
@@ -845,11 +848,12 @@ function Workspace() {
           )}
 
           {stageStudy && (
-            <div className="pointer-events-auto absolute left-1/2 top-3 z-30 flex max-w-[92vw] -translate-x-1/2 items-center gap-2 rounded-full border border-strong bg-card px-3 py-1.5 text-[11.5px] shadow-float">
-              <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">阶段教学</span>
-              <span className="max-w-[42vw] truncate font-medium">{stageStudy.title}</span>
-              <span className="text-muted-foreground">{stageStudyUnits.length} 个函数</span>
-              <button onClick={() => setStageStudyId(null)} className="rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong">退出</button>
+            <div className="pointer-events-auto absolute left-1/2 top-3 z-30 flex max-w-[92vw] -translate-x-1/2 items-center gap-2 overflow-hidden whitespace-nowrap rounded-full border border-strong bg-card px-3 py-1.5 text-[11.5px] shadow-float">
+              <span className="shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">阶段教学</span>
+              <span className="min-w-0 max-w-[44vw] truncate font-medium" title={stageStudy.title}>{stageStudy.title}</span>
+              <span className="shrink-0 text-muted-foreground">{stageStudyUnits.length} 个函数</span>
+              <button onClick={() => setSelectedId(stageStudyId)} className="shrink-0 rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong">详情</button>
+              <button onClick={() => setStageStudyId(null)} className="shrink-0 rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong">退出</button>
             </div>
           )}
 
