@@ -605,7 +605,9 @@ export function layoutTeachingStage(nodes: CanvasNode[], edges: Edge[]): { nodes
   const gapX = TREE_GAP_X;
   const gapY = TREE_GAP_Y;
   const gridW = columns * NODE_W + (columns - 1) * gapX;
-  const stageW = Math.max(NODE_W, Math.min(360, gridW));
+  // A two-column-wide header reads as the parent of the grid without becoming
+  // a full-width banner that dwarfs the function cards.
+  const stageW = Math.max(NODE_W, Math.min(gridW, NODE_W * 2 + gapX));
   const stageX = Math.max(0, (gridW - stageW) / 2);
   const stageH = NODE_H;
   const laid = nodes.map((node) => {
