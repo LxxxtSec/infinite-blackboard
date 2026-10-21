@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Collapsible } from 'radix-ui';
-import { ChevronRight, Crosshair, MessageSquareText, Search, X } from 'lucide-react';
+import { ChevronRight, Crosshair, MessageSquareText, Search, Target, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
@@ -36,9 +36,10 @@ type Props = {
   results: BoardNode[] | null;
   teaching?: TeachingSection | null;
   onOpenStudy?: (id: string) => void;
+  onStudyStage?: (id: string) => void;
 };
 
-export function Sidebar({ current, openItems, findings, inbox, selectedId, counts, onSelect, onSearch, onShortcuts, filter, onFilter, filterOptions, results, teaching, onOpenStudy }: Props) {
+export function Sidebar({ current, openItems, findings, inbox, selectedId, counts, onSelect, onSearch, onShortcuts, filter, onFilter, filterOptions, results, teaching, onOpenStudy, onStudyStage }: Props) {
   const answered = new Set((teaching?.answers || []).map((reply) => reply.requestId));
   const openRequests = (teaching?.requests || []).filter((request) => !answered.has(request.id));
   return (
@@ -87,7 +88,16 @@ export function Sidebar({ current, openItems, findings, inbox, selectedId, count
           {teaching && teaching.stages.length > 0 && (
             <Section title="攻击链" count={teaching.stages.length}>
               {teaching.stages.map((stage) => (
-                <Row key={stage.id} node={stage} selected={selectedId === stage.id} onSelect={onSelect} onOpenStudy={onOpenStudy} subtitle={stage.phase ? phaseLabel(stage.phase) : undefined} />
+                <div key={stage.id} className="flex items-center gap-1">
+                  <div className="min-w-0 flex-1">
+                    <Row node={stage} selected={selectedId === stage.id} onSelect={onSelect} onOpenStudy={undefined} subtitle={stage.phase ? phaseLabel(stage.phase) : undefined} />
+                  </div>
+                  {onStudyStage && (
+                    <button onClick={() => onStudyStage(stage.id)} title="只显示本阶段函数" aria-label={`学习阶段 ${stage.title}`} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
+                      <Target className="size-3.5" />
+                    </button>
+                  )}
+                </div>
               ))}
             </Section>
           )}

@@ -1,5 +1,5 @@
 import { Collapsible } from 'radix-ui';
-import { Check, CheckCircle2, ArrowDownLeft, ArrowUpRight, ChevronRight, FileText, Link2, Lock, LockOpen, X } from 'lucide-react';
+import { Check, CheckCircle2, ArrowDownLeft, ArrowUpRight, ChevronRight, FileText, Link2, Lock, LockOpen, Target, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { IconButton } from '@/components/icon-button';
 import { Button } from '@/components/ui/button';
@@ -24,9 +24,10 @@ type Props = {
   onToggleLearned?: (node: BoardNode) => void;
   locked?: boolean;
   onToggleLock?: () => void;
+  onStudyStage?: (id: string) => void;
 };
 
-export function Inspector({ node, edges, byId, onClose, onFocus, onCopyLink, linkCopied, onOpenStudy, lessons = [], canEdit = false, progressBusy = false, onToggleLearned, locked = false, onToggleLock }: Props) {
+export function Inspector({ node, edges, byId, onClose, onFocus, onCopyLink, linkCopied, onOpenStudy, lessons = [], canEdit = false, progressBusy = false, onToggleLearned, locked = false, onToggleLock, onStudyStage }: Props) {
   const relations = edges.filter((edge) => edge.from === node.id || edge.to === node.id);
   const text = presentNode(node);
   const severe = node.severity === 'critical' || node.severity === 'high';
@@ -61,6 +62,12 @@ export function Inspector({ node, edges, byId, onClose, onFocus, onCopyLink, lin
         )}
         {text.summary && <p className="mt-2 mb-0 text-[13px] leading-[22px] text-subtle">{text.summary}</p>}
         {text.detail && <p className="mt-2 mb-0 text-[13px] leading-[22px] text-subtle">{text.detail}</p>}
+
+        {isStage && onStudyStage && (
+          <Button size="sm" className="mt-3" onClick={() => onStudyStage(node.id)}>
+            <Target className="size-3.5" />只显示本阶段函数
+          </Button>
+        )}
 
         {onToggleLock && (
           <Button size="sm" variant={locked ? 'default' : 'outline'} className="mt-3" onClick={onToggleLock}>

@@ -13,7 +13,7 @@ import { SecurityNode } from './SecurityNode';
 import { focusedIds, neighborInDirection, relatedIds, type ArrowKey } from './canvas-state';
 import { exportCanvasPng } from './export-image';
 import { RoutedEdge } from './RoutedEdge';
-import { currentNodeId, hasTeachingData, layoutGraph, NODE_H, NODE_W, orderedStages, project, typeLabel as typeLabelOf, type CanvasNode, type EdgeStyle, type RelationGroup, type TeachingLayout } from './graph';
+import { currentNodeId, hasTeachingData, layoutGraph, layoutTeachingChain, NODE_H, NODE_W, orderedStages, project, typeLabel as typeLabelOf, type CanvasNode, type EdgeStyle, type RelationGroup, type TeachingLayout } from './graph';
 import { EMPTY_FILTER, filterActive, filterNodes, lessonsForNode, type NodeFilter } from './presentation';
 import type { BoardNode, ViewMode } from './types';
 import { values } from './types';
@@ -83,6 +83,7 @@ function Workspace() {
   const [projectsMode, setProjectsMode] = useState(false);
   const [analysisBypass, setAnalysisBypass] = useState(false);
   const [lockId, setLockId] = useState<string | null>(null);
+  const [stageStudyId, setStageStudyId] = useState<string | null>(null);
   const [analysisRequested, setAnalysisRequested] = useState(false);
   const [analysisPrompt, setAnalysisPrompt] = useState<{ id: number; text: string } | null>(null);
   useEffect(() => {
@@ -135,10 +136,21 @@ function Workspace() {
   const [edges, setEdges] = useEdgesState<Edge>([]);
   const { fitView, getNode, getNodes, setCenter } = useReactFlow<CanvasNode>();
 
-  const projection = useMemo(
-    () => snapshot ? project(snapshot, mode, '', { onlyCode: mode === 'teaching' && (teachingLayout === 'files' || teachingLayout === 'hierarchy') }) : null,
-    [snapshot, mode, teachingLayout],
-  );
+  const projection = useMemo(() => {
+    if (!snapshot) return null;
+    const base = project(snapshot, mode, '', { onlyCode: !stageStudyId && mode === 'teaching' && (teachingLayout === 'files' || teachingLayout === 'hierarchy') });
+    if (!stageStudyId) return base;
+    const stage = base.nodes.find((node) => node.id === stageStudyId && node.data.item.type === 'stage');
+    if (!stage) return base;
+    const unitIds = new Set(base.edges
+      .filter((edge) => (edge.data as { kind?: string } | undefined)?.kind === 'implements' && edge.target === stageStudyId)
+      .map((edge) => edge.source));
+    unitIds.add(stageStudyId);
+    const nodes = base.nodes.filter((node) => unitIds.has(node.id));
+    const ids = new Set(nodes.map((node) => node.id));
+    const edges = base.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target));
+    return { ...base, nodes, edges, hidden: 0 };
+  }, [snapshot, mode, teachingLayout, stageStudyId]);
 
   const allNodes = useMemo(() => (snapshot ? values(snapshot.nodes).filter((node) => node.status !== 'removed') : []), [snapshot]);
   const allEdges = useMemo(() => {
@@ -432,15 +444,25 @@ function Workspace() {
     } else requestAnimationFrame(() => centerOnNode(id));
   }, [projection, centerOnNode]);
 
+  const studyStage = useCallback((id: string) => {
+    const stage = byId.get(id);
+    if (!stage || stage.type !== 'stage') return;
+    setStageStudyId(id);
+    setSelectedId(id);
+    setLockId(null);
+    setMode('teaching');
+  }, [byId]);
+
   const onNodeClick: NodeMouseHandler<CanvasNode> = useCallback((_event, node) => {
     if (node.data.group) return;
     // Dragging also emits a click; only a real click may focus a node and open
     // its implementation.
     if (dragState.current.dragging || dragState.current.moved || Date.now() < dragState.current.suppressUntil) return;
     focusNode(node.id);
-    // Keep the Inspector as the single-click landing. The code panel opens via
+    if (node.data.item.type === 'stage') studyStage(node.id);
+    // Unit single-click stays on the Inspector; the code panel opens via
     // Inspector's 查看实现, the sidebar, or a double click.
-  }, [focusNode]);
+  }, [focusNode, studyStage]);
 
   const onNodeDragStart: OnNodeDrag<CanvasNode> = useCallback((_event, node) => {
     dragState.current.start = { x: node.position.x, y: node.position.y };
@@ -473,12 +495,13 @@ function Workspace() {
   const selectFromSidebar = useCallback((id: string) => {
     const node = byId.get(id);
     if (node?.type === 'unit') setStudyId(id);
+    if (node?.type === 'stage') studyStage(id);
     focusNode(id);
-  }, [byId, focusNode]);
+  }, [byId, focusNode, studyStage]);
 
   useEffect(() => {
     if (!projection) return;
-    const key = JSON.stringify([mode, direction, overviewColumns, teachingLayout, layoutEpoch, projection.nodes.map((node) => node.id), projection.edges.map((edge) => [edge.id, edge.source, edge.target])]);
+    const key = JSON.stringify([mode, direction, overviewColumns, teachingLayout, stageStudyId, layoutEpoch, projection.nodes.map((node) => node.id), projection.edges.map((edge) => [edge.id, edge.source, edge.target])]);
     // Content-only stream updates must not discard dragged positions or reset zoom.
     if (layoutKey.current === key) {
       const fresh = new Map(projection.nodes.map((node) => [node.id, node.data]));
@@ -491,7 +514,10 @@ function Workspace() {
       return;
     }
     let cancelled = false;
-    layoutGraph(projection.nodes, projection.edges, direction, mode === 'all', overviewColumns, mode === 'teaching' ? teachingLayout : null).then((layouted) => {
+    const work = stageStudyId
+      ? Promise.resolve(layoutTeachingChain(projection.nodes, projection.edges))
+      : layoutGraph(projection.nodes, projection.edges, direction, mode === 'all', overviewColumns, mode === 'teaching' ? teachingLayout : null);
+    work.then((layouted) => {
       if (cancelled) return;
       layoutKey.current = key;
       setNodes(layouted.nodes);
@@ -499,7 +525,7 @@ function Workspace() {
       setLayoutRevision((revision) => revision + 1);
     });
     return () => { cancelled = true; };
-  }, [projection, mode, direction, overviewColumns, teachingLayout, layoutEpoch, setNodes, setEdges]);
+  }, [projection, mode, direction, overviewColumns, teachingLayout, stageStudyId, layoutEpoch, setNodes, setEdges]);
 
   useEffect(() => {
     if (!initialized || !layoutRevision || framedRevision.current === layoutRevision) return;
@@ -600,6 +626,7 @@ function Workspace() {
 
   const switchMode = (next: ViewMode) => {
     if (next === mode) return;
+    setStageStudyId(null);
     if (next === 'teaching' && !teaching) return;
     pendingFocus.current = null;
     setSelectedId(null);
@@ -630,6 +657,11 @@ function Workspace() {
   const annotatedUnits = allNodes.filter((node) => node.type === 'unit' && node.status !== 'removed' && node.kind !== 'macro' && node.role).length;
   const analysisReady = Number(stats.stages || 0) > 0 || lessons.length > 0 || annotatedUnits > 0;
   const needsAnalysis = projectsMode && Number(stats.units || 0) > 0 && !analysisReady;
+  const stageStudy = stageStudyId ? byId.get(stageStudyId) || null : null;
+  const stageStudyUnits = stageStudy
+    ? allEdges.filter((edge) => edge.kind === 'implements' && edge.to === stageStudy.id)
+      .map((edge) => byId.get(edge.from)).filter((node): node is BoardNode => Boolean(node))
+    : [];
   const requestMacroNotes = (missing: BoardNode[]) => {
     if (!snapshot?.requestToken || isStatic || !missing.length) return;
     const list = missing.slice(0, 120).map((macro) => `${macro.id} ${macro.symbol || macro.title} (${macro.file}:${macro.startLine})`).join('\n');
@@ -703,6 +735,7 @@ function Workspace() {
                 results={results}
                 teaching={teaching}
                 onOpenStudy={setStudyId}
+                onStudyStage={studyStage}
               />
             </aside>
             <ResizeHandle side="left" width={sidebarWidth} min={220} max={480} defaultValue={264} onChange={setSidebarWidth} label="调整左侧导航宽度" />
@@ -741,7 +774,7 @@ function Workspace() {
             onNodeDragStart={onNodeDragStart}
             onNodeDrag={onNodeDrag}
             onNodeDragStop={onNodeDragStop}
-            onNodeDoubleClick={(_event, node) => { if (!node.data.group) setStudyId(node.id); }}
+            onNodeDoubleClick={(_event, node) => { if (node.data.group) return; if (node.data.item.type === 'stage') studyStage(node.id); else setStudyId(node.id); }}
             onPaneClick={() => setSelectedId(null)}
             nodesConnectable={false}
             deleteKeyCode={null}
@@ -811,6 +844,15 @@ function Workspace() {
             </div>
           )}
 
+          {stageStudy && (
+            <div className="pointer-events-auto absolute left-1/2 top-3 z-30 flex max-w-[92vw] -translate-x-1/2 items-center gap-2 rounded-full border border-strong bg-card px-3 py-1.5 text-[11.5px] shadow-float">
+              <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">阶段教学</span>
+              <span className="max-w-[42vw] truncate font-medium">{stageStudy.title}</span>
+              <span className="text-muted-foreground">{stageStudyUnits.length} 个函数</span>
+              <button onClick={() => setStageStudyId(null)} className="rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong">退出</button>
+            </div>
+          )}
+
           {mode === 'context' && !currentId && teaching && (
             <div className="pointer-events-auto absolute left-1/2 top-14 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border bg-card px-3 py-1 text-[11px] shadow-float">
               <span className="text-muted-foreground">Agent 尚未设置游标 · 现场显示攻击链骨架</span>
@@ -850,7 +892,7 @@ function Workspace() {
 
           <p className="sr-only" role="status" aria-live="polite">{selected ? `已选中${typeLabelOf(selected.type)}：${selected.title}` : ''}</p>
 
-          {selected && <Inspector node={selected} edges={allEdges} byId={byId} lessons={selectedLessons} onClose={() => setSelectedId(null)} onFocus={focusNode} onOpenStudy={setStudyId} onCopyLink={isStatic ? undefined : copyNodeLink} linkCopied={linkCopied} canEdit={!isStatic} progressBusy={progressBusy === selected.id} onToggleLearned={toggleLearned} locked={lockId === selected?.id} onToggleLock={() => setLockId((current) => current === selected?.id ? null : selected?.id || null)} />}
+          {selected && <Inspector node={selected} edges={allEdges} byId={byId} lessons={selectedLessons} onClose={() => setSelectedId(null)} onFocus={focusNode} onOpenStudy={setStudyId} onCopyLink={isStatic ? undefined : copyNodeLink} linkCopied={linkCopied} canEdit={!isStatic} progressBusy={progressBusy === selected.id} onToggleLearned={toggleLearned} locked={lockId === selected?.id} onToggleLock={() => setLockId((current) => current === selected?.id ? null : selected?.id || null)} onStudyStage={studyStage} />}
           {studyNode && <StudyPanel snapshot={snapshot} node={studyNode} onClose={() => { setStudyId(null); studyRef.current = null; }} canEdit={!isStatic} progressBusy={progressBusy === studyNode.id} onToggleLearned={toggleLearned} />}
         </main>
 
