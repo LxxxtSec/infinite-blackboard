@@ -88,8 +88,8 @@ export const SecurityNode = memo(function SecurityNode({ id, data, selected }: N
         fresh && 'fresh-pulse',
       )}
     >
-      {studyOrder && (
-        <span className="absolute right-2.5 top-2.5 z-10 rounded-full bg-node-stage/20 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-node-stage">
+      {studyOrder && overview && (
+        <span className="absolute -top-2 right-2 z-10 rounded-full border border-node-stage/30 bg-card px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-node-stage shadow-xs">
           #{studyOrder}
         </span>
       )}
@@ -97,6 +97,7 @@ export const SecurityNode = memo(function SecurityNode({ id, data, selected }: N
       <Handle type="target" position={vertical ? Position.Top : Position.Left} className={handleClass} />
       {!overview && (
         <header className="flex items-center gap-1.5 text-[11px] leading-4 text-muted-foreground">
+          {studyOrder && <span className="shrink-0 rounded-full bg-node-stage/15 px-1.5 text-[10px] font-semibold tabular-nums text-node-stage">#{studyOrder}</span>}
           <span className="inline-flex items-center gap-1 font-medium text-[color-mix(in_srgb,var(--c)_78%,var(--ink))]">
             <NodeTypeIcon type={item.type} size={12} />{typeLabel(item.type)}
           </span>
