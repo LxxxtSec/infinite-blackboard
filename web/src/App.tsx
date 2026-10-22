@@ -757,7 +757,22 @@ function Workspace() {
           </>
         )}
 
-        <main ref={viewportRef} className="relative min-w-0 flex-1" aria-label="思考画布">
+        <main ref={viewportRef} className="relative flex min-w-0 flex-1 flex-col" aria-label="思考画布">
+          {stageStudy && (
+            <div className="relative z-20 flex h-10 shrink-0 items-center gap-2 overflow-hidden border-b bg-secondary/30 px-3 text-[11.5px]">
+              <span className="shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">阶段教学</span>
+              <span className="min-w-0 flex-1 truncate font-medium" title={stageStudy.title}>{stageStudy.title}</span>
+              <span className="shrink-0 text-muted-foreground max-md:hidden">{stageStudyUnits.length} 个函数 · 先基础后入口</span>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {stageStudyUnits[0] && (
+                  <button onClick={() => { setStudyId(stageStudyUnits[0].id); setSelectedId(stageStudyUnits[0].id); }} className="rounded-full bg-foreground px-2 py-0.5 text-[10.5px] text-background hover:opacity-90">从 #1 开始</button>
+                )}
+                <button onClick={() => setSelectedId(stageStudyId)} className="rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong">详情</button>
+                <button onClick={() => setStageStudyId(null)} className="rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong">退出</button>
+              </div>
+            </div>
+          )}
+          <div className="relative min-h-0 flex-1">
           {needsAnalysis && !analysisBypass && (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/95 p-6 backdrop-blur-[1px]">
               <div className="w-[min(520px,100%)] rounded-xl border bg-card p-5 shadow-float">
@@ -859,19 +874,6 @@ function Workspace() {
             </div>
           )}
 
-          {stageStudy && (
-            <div className="pointer-events-auto absolute left-1/2 top-14 z-30 flex max-w-[92vw] -translate-x-1/2 items-center gap-2 overflow-hidden whitespace-nowrap rounded-full border border-strong bg-card px-3 py-1.5 text-[11.5px] shadow-float">
-              <span className="shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">阶段教学</span>
-              <span className="min-w-0 max-w-[44vw] truncate font-medium" title={stageStudy.title}>{stageStudy.title}</span>
-              <span className="shrink-0 text-muted-foreground">{stageStudyUnits.length} 个函数 · 先基础后入口</span>
-              {stageStudyUnits[0] && (
-                <button onClick={() => { setStudyId(stageStudyUnits[0].id); setSelectedId(stageStudyUnits[0].id); }} className="shrink-0 rounded-full bg-foreground px-2 py-0.5 text-[10.5px] text-background hover:opacity-90">从 #1 开始</button>
-              )}
-              <button onClick={() => setSelectedId(stageStudyId)} className="shrink-0 rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong">详情</button>
-              <button onClick={() => setStageStudyId(null)} className="shrink-0 rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong">退出</button>
-            </div>
-          )}
-
           {mode === 'context' && !currentId && teaching && (
             <div className="pointer-events-auto absolute left-1/2 top-14 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border bg-card px-3 py-1 text-[11px] shadow-float">
               <span className="text-muted-foreground">Agent 尚未设置游标 · 现场显示攻击链骨架</span>
@@ -913,6 +915,7 @@ function Workspace() {
 
           {selected && <Inspector node={selected} edges={allEdges} byId={byId} lessons={selectedLessons} onClose={() => setSelectedId(null)} onFocus={focusNode} onOpenStudy={setStudyId} onCopyLink={isStatic ? undefined : copyNodeLink} linkCopied={linkCopied} canEdit={!isStatic} progressBusy={progressBusy === selected.id} onToggleLearned={toggleLearned} locked={lockId === selected?.id} onToggleLock={() => setLockId((current) => current === selected?.id ? null : selected?.id || null)} onStudyStage={studyStage} />}
           {studyNode && <StudyPanel snapshot={snapshot} node={studyNode} onClose={() => { setStudyId(null); studyRef.current = null; }} canEdit={!isStatic} progressBusy={progressBusy === studyNode.id} onToggleLearned={toggleLearned} />}
+          </div>
         </main>
 
         {chatOpen && (
