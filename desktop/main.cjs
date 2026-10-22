@@ -104,6 +104,23 @@ function createWindow() {
       if (/^https?:/i.test(url)) shell.openExternal(url);
     }
   });
+  mainWindow.webContents.on('context-menu', (_event, params) => {
+    if (!params.selectionText && !params.isEditable) return;
+    const template = [];
+    if (params.isEditable) {
+      template.push({ role: 'cut', label: '剪切', enabled: params.editFlags.canCut });
+    }
+    if (params.selectionText || params.isEditable) {
+      template.push({ role: 'copy', label: '复制', enabled: params.editFlags.canCopy || Boolean(params.selectionText) });
+    }
+    if (params.isEditable) {
+      template.push({ role: 'paste', label: '粘贴', enabled: params.editFlags.canPaste });
+      template.push({ type: 'separator' });
+    }
+    template.push({ role: 'selectAll', label: '全选' });
+    Menu.buildFromTemplate(template).popup({ window: mainWindow });
+  });
+
   mainWindow.on('close', (event) => {
     if (!quitting && tray) {
       event.preventDefault();
@@ -182,6 +199,18 @@ function buildMenu() {
       { label: '打开项目目录', click: openProjects },
       { label: '重新加载页面', accelerator: 'CmdOrCtrl+R', click: () => mainWindow && mainWindow.reload() },
       ...(!isMac ? [{ type: 'separator' }, { role: 'quit' }] : []),
+    ] },
+    { label: '编辑', submenu: [
+      { role: 'undo', label: '撤销' },
+      { role: 'redo', label: '重做' },
+      { type: 'separator' },
+      { role: 'cut', label: '剪切' },
+      { role: 'copy', label: '复制' },
+      { role: 'paste', label: '粘贴' },
+      { role: 'pasteAndMatchStyle', label: '粘贴并匹配格式' },
+      { role: 'delete', label: '删除' },
+      { type: 'separator' },
+      { role: 'selectAll', label: '全选' },
     ] },
     { label: '服务', submenu: [
       { label: '重启本地服务', click: () => { void restartBoard(); } },
