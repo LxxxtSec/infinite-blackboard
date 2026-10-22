@@ -8,6 +8,7 @@ import { IconButton } from '@/components/icon-button';
 import { BrandMark } from '../BrandMark';
 import { ActivityPopover } from './ActivityPopover';
 import { ProjectMenu } from './ProjectMenu';
+import { ExportMenu } from './ExportMenu';
 import type { Connection } from '../use-graph-stream';
 import type { Activity, ViewMode } from '../types';
 
@@ -80,6 +81,7 @@ export function Topbar(props: Props) {
             <Sparkles className="size-3.5" /><span className="max-md:hidden">分析</span>
           </Button>
         )}
+        {!isStatic && <ExportMenu />}
         <ProjectMenu token={requestToken} canEdit={Boolean(canEdit)} />
         {(macroCount || 0) > 0 && (
           <Button size="sm" variant="outline" onClick={onOpenMacros} aria-label="宏查询">
