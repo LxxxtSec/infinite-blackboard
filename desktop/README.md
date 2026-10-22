@@ -16,6 +16,14 @@ npm install
 npm run desktop:dev
 ```
 
+## 渲染冒烟测试
+
+```bash
+npm run desktop:smoke
+```
+
+会启动真实服务、在隐藏窗口加载真实构建；如果 React 根为空或出现 hook 错误会返回非 0。
+
 ## 打包
 
 ```bash

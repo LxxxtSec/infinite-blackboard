@@ -22,7 +22,8 @@
     "board:status": "./scripts/board-status.sh",
     "desktop:dev": "electron desktop/main.cjs",
     "desktop:pack": "electron-builder --config desktop/electron-builder.yml --dir",
-    "desktop:dist": "electron-builder --config desktop/electron-builder.yml"
+    "desktop:dist": "electron-builder --config desktop/electron-builder.yml",
+    "desktop:smoke": "electron desktop/smoke.cjs"
   },
   "license": "MIT",
   "dependencies": {
