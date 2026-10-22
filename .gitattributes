@@ -1,0 +1,2 @@
+# Keep Windows launchers usable after clone
+*.cmd text eol=crlf
