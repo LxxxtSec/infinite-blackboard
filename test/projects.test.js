@@ -34,9 +34,20 @@ test('projects mode starts empty, creates/switches projects, imports and reports
   const createdBody = await created.json();
   assert.equal(createdBody.project.title, '第二个项目');
 
+  const renamed = await fetch(`${api}/api/projects/rename`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-blackboard-request': token },
+    body: JSON.stringify({ id: createdBody.project.id, name: '重命名后的项目' }),
+  });
+  assert.equal(renamed.status, 200);
+  const renamedBody = await renamed.json();
+  assert.equal(renamedBody.project.title, '重命名后的项目');
+  assert.equal(renamedBody.project.id, createdBody.project.id);
+
   const listed = await (await fetch(`${api}/api/projects`)).json();
   assert.equal(listed.projects.length, 2);
-  assert.ok(listed.projects.some((project) => project.id === createdBody.project.id && project.active));
+  assert.ok(listed.projects.some((project) => project.id === createdBody.project.id && project.active && project.title === '重命名后的项目'));
+  assert.equal((await (await fetch(`${api}/api/graph`)).json()).meta.title, '重命名后的项目');
 
   const source = path.join(base, 'src');
   fs.mkdirSync(source);

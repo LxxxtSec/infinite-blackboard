@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FolderTree, Plus, Trash2, X } from 'lucide-react';
+import { FolderTree, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/icon-button';
 import { formatTime } from '../graph';
@@ -31,6 +31,8 @@ export function ProjectMenu({ token, canEdit }: { token?: string; canEdit: boole
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [renameId, setRenameId] = useState<string | null>(null);
+  const [renameName, setRenameName] = useState('');
 
   const load = async () => {
     try {
@@ -75,6 +77,28 @@ export function ProjectMenu({ token, canEdit }: { token?: string; canEdit: boole
     catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : '删除失败'); setBusy(false); setConfirmId(null); }
   };
 
+  const startRename = (project: Project) => {
+    setRenameId(project.id);
+    setRenameName(project.title);
+    setConfirmId(null);
+    setError(null);
+  };
+
+  const rename = async (id: string) => {
+    const next = renameName.trim();
+    if (!next) return;
+    setBusy(true); setError(null);
+    try {
+      await post('/api/projects/rename', { id, name: next });
+      await load();
+      setRenameId(null);
+      setBusy(false);
+    } catch (renameError) {
+      setError(renameError instanceof Error ? renameError.message : '重命名失败');
+      setBusy(false);
+    }
+  };
+
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => { setOpen(true); void load(); }} aria-label="项目列表">
@@ -117,6 +141,16 @@ export function ProjectMenu({ token, canEdit }: { token?: string; canEdit: boole
                     <Button
                       size="sm"
                       variant="ghost"
+                      aria-label={`重命名项目 ${project.title}`}
+                      title="重命名项目"
+                      disabled={busy || !canEdit}
+                      onClick={() => startRename(project)}
+                    >
+                      <Pencil className="size-3.5 text-muted-foreground" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       aria-label={`删除项目 ${project.title}`}
                       title={data.projects.length <= 1 ? '至少保留一个项目' : '删除项目'}
                       disabled={busy || !canEdit || data.projects.length <= 1}
@@ -125,6 +159,22 @@ export function ProjectMenu({ token, canEdit }: { token?: string; canEdit: boole
                       <Trash2 className="size-3.5 text-muted-foreground" />
                     </Button>
                     </div>
+                    {renameId === project.id && (
+                      <div className="mt-1 flex flex-wrap items-center gap-2 rounded-lg border border-strong bg-secondary/40 px-3 py-2">
+                        <span className="shrink-0 text-[11px] text-muted-foreground">项目名称</span>
+                        <input
+                          autoFocus
+                          value={renameName}
+                          maxLength={80}
+                          disabled={busy}
+                          onChange={(event) => setRenameName(event.target.value)}
+                          onKeyDown={(event) => { if (event.key === 'Enter') void rename(project.id); if (event.key === 'Escape') setRenameId(null); }}
+                          className="h-8 min-w-0 flex-1 rounded-md border bg-card px-2 text-[12px] outline-none focus-visible:border-strong"
+                        />
+                        <Button size="sm" disabled={busy || !renameName.trim()} onClick={() => void rename(project.id)}>保存</Button>
+                        <Button size="sm" variant="outline" disabled={busy} onClick={() => setRenameId(null)}>取消</Button>
+                      </div>
+                    )}
                     {confirmId === project.id && (
                       <div className="mt-1 flex flex-wrap items-center gap-2 rounded-lg border border-destructive/40 bg-danger-soft px-3 py-2">
                         <span className="min-w-0 flex-1 text-[11px] leading-5 text-destructive">
