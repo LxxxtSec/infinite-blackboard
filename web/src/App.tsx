@@ -726,6 +726,7 @@ function Workspace() {
         canEdit={!isStatic}
         canAnalyze={!isStatic && Number(stats.units || 0) > 0}
         onAnalyze={requestAnalysis}
+        currentStageId={stageStudyId || (selected?.type === 'stage' ? selected.id : null)}
       />
 
       <div className="relative flex min-h-0 flex-1">

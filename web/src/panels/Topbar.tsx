@@ -41,6 +41,7 @@ type Props = {
   canEdit?: boolean;
   canAnalyze?: boolean;
   onAnalyze?: () => void;
+  currentStageId?: string | null;
 };
 
 const CONNECTION = {
@@ -50,7 +51,7 @@ const CONNECTION = {
 } as const;
 
 export function Topbar(props: Props) {
-  const { title, mode, onMode, theme, onTheme, connection, isStatic, sidebarOpen, onToggleSidebar, onSearch, onDigest, digestRef, activities, activityTotal, hasTeaching, coverage, openRequests, learned, units, chatOpen, onToggleChat, onManage, macroCount, onOpenMacros, requestToken, canEdit = false, canAnalyze = false, onAnalyze } = props;
+  const { title, mode, onMode, theme, onTheme, connection, isStatic, sidebarOpen, onToggleSidebar, onSearch, onDigest, digestRef, activities, activityTotal, hasTeaching, coverage, openRequests, learned, units, chatOpen, onToggleChat, onManage, macroCount, onOpenMacros, requestToken, canEdit = false, canAnalyze = false, onAnalyze, currentStageId } = props;
   const status = isStatic ? { label: '离线快照', dot: 'bg-strong' } : CONNECTION[connection];
   return (
     <header className="grid h-12 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 border-b bg-background px-3">
@@ -81,7 +82,7 @@ export function Topbar(props: Props) {
             <Sparkles className="size-3.5" /><span className="max-md:hidden">分析</span>
           </Button>
         )}
-        {!isStatic && <ExportMenu />}
+        {!isStatic && <ExportMenu currentStageId={currentStageId} />}
         <ProjectMenu token={requestToken} canEdit={Boolean(canEdit)} />
         {(macroCount || 0) > 0 && (
           <Button size="sm" variant="outline" onClick={onOpenMacros} aria-label="宏查询">

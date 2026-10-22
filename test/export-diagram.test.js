@@ -34,14 +34,27 @@ test('module export groups stage functions and keeps call edges', () => {
   assert.match(xml, /target="module-0-unit-1"/);
 });
 
+test('current-stage export only contains that module', () => {
+  const g = graph();
+  const xml = drawioXml(g, 'stage', 'st1');
+  assert.doesNotMatch(xml, /id="overview"/);
+  assert.match(xml, /name="堆布局"/);
+  const xmind = xmindContent(g, 'stage', 'st1');
+  assert.equal(xmind.content.length, 1);
+  assert.equal(xmind.content[0].rootTopic.title, '堆布局');
+});
+
 test('XMind export is a zip with modern XMind JSON sheets', () => {
   const g = graph();
   const content = xmindContent(g, 'stage');
   const sheet = content.content[0];
   assert.equal(sheet.class, 'sheet');
   assert.equal(sheet.rootTopic.children.attached[0].title, '堆布局');
-  assert.equal(sheet.rootTopic.children.attached[0].children.attached.length, 2);
-  assert.match(sheet.rootTopic.children.attached[0].children.attached[0].notes.plain.content, /heap.c/);
+  assert.ok(content.content.length > 1, 'one sheet per stage plus overview');
+  const stageSheet = content.content.find((item) => item.title === '堆布局');
+  assert.ok(stageSheet);
+  assert.equal(stageSheet.rootTopic.children.attached.length, 2);
+  assert.match(stageSheet.rootTopic.children.attached[0].notes.plain.content, /heap.c/);
   const zip = xmindZip(g, 'stage');
   assert.ok(Buffer.isBuffer(zip));
   assert.equal(zip.subarray(0, 4).toString('hex'), '504b0304');
