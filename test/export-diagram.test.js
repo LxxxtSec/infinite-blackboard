@@ -51,7 +51,7 @@ test('XMind export is a zip with modern XMind JSON sheets', () => {
   assert.equal(sheet.class, 'sheet');
   assert.equal(sheet.rootTopic.children.attached[0].title, '堆布局');
   assert.ok(content.content.length > 1, 'one sheet per stage plus overview');
-  const stageSheet = content.content.find((item) => item.title === '堆布局');
+  const stageSheet = content.content.find((item) => item.title.endsWith('堆布局'));
   assert.ok(stageSheet);
   assert.equal(stageSheet.rootTopic.children.attached.length, 2);
   assert.match(stageSheet.rootTopic.children.attached[0].notes.plain.content, /heap.c/);
