@@ -242,7 +242,7 @@ blackboard chain clear                         # 清空（阶段标记 removed�
 - 右上角齿轮选择运行方式：
   - **外部轮询**（默认）：提交后写一条 `request` 事件；Claude Code / Codex 用 `blackboard requests` 读取，用 `blackboard reply` 写回；SSE 实时刷新。
   - **模型 API**：OpenAI 兼容的 base URL / model / key，服务端流式回答，展示 reasoning 摘要与「停止」；回答结束写回 `reply`。
-  - **本地 Agent CLI**：命令模板必须含 `{prompt}`（Claude / Codex / Pi / 任意 CLI），服务端通过 `/bin/sh -lc` 启动、解析 JSONL/纯文本、流式展示思考/工具步骤；停止会杀掉进程组。Pi 预设已经带 `--mode json --thinking high --no-session`；思考事件取决于模型是否支持 reasoning。
+  - **本地 Agent CLI**：命令模板必须含 `{prompt}`（Claude / Codex / Pi / 任意 CLI），服务端在 macOS/Linux 通过 `/bin/sh -lc`、Windows 通过 PowerShell `-Command` 启动，解析 JSONL/纯文本、流式展示思考/工具步骤；停止会杀掉进程树。Pi 预设已经带 `--mode json --thinking high --no-session`；思考事件取决于模型是否支持 reasoning。
 - 密钥只存在本机 `.flow/agent.json`（0600），不会下发浏览器；流式中断会保存已生成部分并标记 `stopped`。
 - 离线导出的 HTML 里可以查看历史对话，但不能继续提问。
 

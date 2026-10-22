@@ -114,6 +114,37 @@ blackboard lint        # 孤立节点、缺证据的结论、日志损坏等提�
 - `blackboard lint` 只报告上下文质量，永远以退出状态 0 返回；
 - Hook 只是可选的恢复辅助（会话开始注入 Digest、压缩前存检查点）；原始活动采集需要显式加 `--with-activity`。正常使用不依赖 Hook。
 
+## Windows（Web 端）
+
+Windows 用户只需要 **Node.js ≥18**，克隆后即可运行已构建好的 Web 画布，**不需要 `npm install`**：
+
+```bat
+git clone https://github.com/LxxxtSec/infinite-blackboard.git
+cd infinite-blackboard
+start-board.cmd
+```
+
+等价于：
+
+```bat
+node bin\blackboard.js serve --projects "%USERPROFILE%\blackboard-projects" --port 4337 --open
+```
+
+也可以使用 npm 脚本：
+
+```bat
+npm run serve -- --projects "%USERPROFILE%\blackboard-projects" --port 4337 --open
+```
+
+说明：
+
+- `public/` 里已提交构建产物，运行服务不需要安装前端依赖；只有改源码/构建时才需要 `npm install && npm run build`；
+- 本地路径导入可直接用；zip 导入优先用 `unzip`，没有时回退到系统自带 `tar.exe`；
+- Git 仓库导入需要安装 Git；
+- 本地 CLI Agent 在 Windows 通过 PowerShell 启动，需自行安装并登录 `claude` / `codex` / `pi` 等命令；
+- `scripts/board-*.sh` 和 `.command` 是 macOS 一键脚本，Windows 用 `start-board.cmd` 或上面的 `serve` 命令；
+- 数据默认在 `%USERPROFILE%\blackboard-projects`，可用 `PROJECTS` 环境变量覆盖。
+
 ## 桌面版
 
 仓库包含一个最小 Electron 外壳（`desktop/`），不重写现有 Web/服务，只负责启动、窗口、托盘和退出清理：

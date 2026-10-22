@@ -7,10 +7,15 @@ import http from 'node:http';
 
 import {
   defaultAgentConfig, saveAgentConfig, loadAgentConfig, publicAgentConfig,
-  createJsonlParser, runCli, runOpenAI, buildAgentPrompt,
+  createJsonlParser, runCli, runOpenAI, buildAgentPrompt, quoteCliPrompt,
 } from '../lib/agent.js';
 import { ensure, replay, stats } from '../lib/store.js';
 import { startServer } from '../lib/server.js';
+
+test('CLI prompt quoting is platform-specific', () => {
+  assert.equal(quoteCliPrompt("a'b", 'linux'), "'a'\\''b'");
+  assert.equal(quoteCliPrompt("a'b", 'win32'), "'a''b'");
+});
 
 function board(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'blackboard-agent-'));

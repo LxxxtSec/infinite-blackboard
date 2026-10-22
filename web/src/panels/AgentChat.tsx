@@ -583,7 +583,7 @@ function SettingsDialog({ open, config, onClose, token, onSaved }: {
                 <textarea value={commandLine} onChange={(event) => setCommandLine(event.target.value)} rows={3} spellCheck={false} className="rounded-md border bg-card p-2 font-mono text-[11px]" />
               </label>
               <p className="m-0 text-[10.5px] leading-4 text-muted-foreground">
-                通过 <code className="font-mono">/bin/sh -lc</code> 执行；输出按 JSONL 自动解析（Claude stream-json、Pi JSON、Codex JSON、纯文本都兼容）。停止会杀掉进程组。
+                通过 <code className="font-mono">/bin/sh -lc</code>（Windows 为 PowerShell <code className="font-mono">-Command</code>）执行；输出按 JSONL 自动解析（Claude stream-json、Pi JSON、Codex JSON、纯文本都兼容）。停止会杀掉进程树。
                 <br />Pi 的思考需要 <code className="font-mono">--mode json --thinking high</code>，且模型支持 reasoning；没有思考事件时会明确提示，而不是静默空白。
               </p>
             </>
