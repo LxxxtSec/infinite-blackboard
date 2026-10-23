@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { ChevronDown, FileText, Focus, GitBranch, Hash, ListTree, MessageSquareText, Moon, PanelLeft, Search, Sparkles, Sun, Upload } from 'lucide-react';
+import { FileText, Focus, GitBranch, Hash, ListTree, MessageSquareText, Moon, PanelLeft, Search, Sparkles, Sun, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
@@ -9,7 +9,6 @@ import { BrandMark } from '../BrandMark';
 import { ActivityPopover } from './ActivityPopover';
 import { ProjectMenu } from './ProjectMenu';
 import { ExportMenu } from './ExportMenu';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { Connection } from '../use-graph-stream';
 import type { Activity, ViewMode } from '../types';
 
@@ -85,22 +84,9 @@ export function Topbar(props: Props) {
               <Sparkles className="size-3.5" /><span className="max-md:hidden">分析</span>
             </Button>
             {onRegroupChain && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button size="sm" variant="outline" aria-label="更多分析操作" title="更多分析操作">
-                    <ChevronDown className="size-3.5" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent side="bottom" align="end" sideOffset={8} className="w-72 p-2">
-                  <button onClick={onRegroupChain} className="flex w-full items-start gap-2 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-accent">
-                    <Sparkles className="mt-0.5 size-3.5 shrink-0 text-live" />
-                    <span>
-                      <span className="block text-[12px] font-medium">按手法重组攻击链</span>
-                      <span className="mt-0.5 block text-[10.5px] leading-4 text-muted-foreground">不重读/不改函数标注；同一手法里的堆布局、泄漏合并为一个阶段。</span>
-                    </span>
-                  </button>
-                </PopoverContent>
-              </Popover>
+              <Button size="sm" variant="outline" onClick={onRegroupChain} aria-label="按手法重组攻击链" title="按手法重组攻击链：同一手法里的堆布局、泄漏合并为一个阶段">
+                <GitBranch className="size-3.5" /><span className="max-md:hidden">重组</span>
+              </Button>
             )}
           </>
         )}

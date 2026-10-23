@@ -676,6 +676,9 @@ function Workspace() {
       allEdges,
     )
     : [];
+  const stageStudyIndex = stageStudy && teaching ? teaching.stages.findIndex((stage) => stage.id === stageStudy.id) : -1;
+  const previousStage = stageStudyIndex > 0 ? teaching?.stages[stageStudyIndex - 1] : null;
+  const nextStage = stageStudyIndex >= 0 && teaching && stageStudyIndex < teaching.stages.length - 1 ? teaching.stages[stageStudyIndex + 1] : null;
   const requestMacroNotes = (missing: BoardNode[]) => {
     if (!snapshot?.requestToken || isStatic || !missing.length) return;
     const list = missing.slice(0, 120).map((macro) => `${macro.id} ${macro.symbol || macro.title} (${macro.file}:${macro.startLine})`).join('\n');
@@ -693,7 +696,8 @@ function Workspace() {
 - 一个阶段 = 一个可以独立命名的技术步骤（例如 KernelSnitch、fake object、stack overlap、KASLR leak、read primitive、root、payload、cleanup）；
 - 同一技术流程里的准备、堆布局、对象喷洒、泄漏/读取要放在同一阶段；
 - 例如 KernelSnitch 阶段同时覆盖堆布局和 mm_struct 泄露，不能拆成两个阶段；
-- 目标通常 4-8 个阶段，阶段标题写技术目标，detail 写关键动作，units 列出该阶段实现函数。
+- 目标通常 4-8 个阶段，阶段标题写技术目标，detail 写关键动作，units 列出该阶段实现函数；
+- 每个代码单元只归入一个主阶段，禁止同一函数出现在多个阶段，共享 helper 归到首次出现且最相关的阶段。
 
 完成后回复分析摘要。`;
     setChatOpen(true);
@@ -711,7 +715,8 @@ function Workspace() {
 - 同一技术流程里的准备、堆布局、对象喷洒、泄漏/读取必须放在同一阶段；
 - 例如 KernelSnitch 阶段同时覆盖堆布局和 mm_struct 泄露，不要拆成两个阶段；
 - 目标通常 4-8 个阶段，避免一个函数/一个准备动作一个阶段；
-- 每个阶段标题写技术目标，detail 写关键动作，units 重新列出该阶段的实现函数。
+- 每个阶段标题写技术目标，detail 写关键动作，units 重新列出该阶段的实现函数；
+- 每个代码单元只归入一个主阶段，禁止同一函数出现在多个阶段，共享 helper 归到首次出现且最相关的阶段。
 
 用 chain import --replace 写回，完成后回复新的阶段列表。`;
     setChatOpen(true);
@@ -788,13 +793,20 @@ function Workspace() {
           {stageStudy && (
             <div className="relative z-20 flex h-10 shrink-0 items-center gap-2 overflow-hidden border-b bg-secondary/30 px-3 text-[11.5px]">
               <span className="shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">阶段教学</span>
+              <span className="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">{stageStudyIndex + 1}/{teaching?.stages.length || 0}</span>
               <span className="min-w-0 flex-1 truncate font-medium" title={stageStudy.title}>{stageStudy.title}</span>
               <span className="shrink-0 text-muted-foreground max-md:hidden">{stageStudyUnits.length} 个函数 · 先基础后入口</span>
               <div className="flex shrink-0 items-center gap-1.5">
+                {previousStage && (
+                  <button onClick={() => studyStage(previousStage.id)} className="rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong" title={`上一阶段：${previousStage.title}`}>上一阶段</button>
+                )}
                 {stageStudyUnits[0] && (
                   <button onClick={() => { setStudyId(stageStudyUnits[0].id); setSelectedId(stageStudyUnits[0].id); }} className="rounded-full bg-foreground px-2 py-0.5 text-[10.5px] text-background hover:opacity-90">从 #1 开始</button>
                 )}
                 <button onClick={() => setSelectedId(stageStudyId)} className="rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong">详情</button>
+                {nextStage && (
+                  <button onClick={() => studyStage(nextStage.id)} className="rounded-full border border-strong px-2 py-0.5 text-[10.5px] hover:border-foreground" title={`下一阶段：${nextStage.title}`}>下一阶段</button>
+                )}
                 <button onClick={() => setStageStudyId(null)} className="rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong">退出</button>
               </div>
             </div>

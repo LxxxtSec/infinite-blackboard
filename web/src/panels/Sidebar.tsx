@@ -103,10 +103,10 @@ export function Sidebar({ current, openItems, findings, inbox, selectedId, count
 
           {teaching && teaching.stages.length > 0 && (
             <Section title="攻击链" count={teaching.stages.length}>
-              {teaching.stages.map((stage) => (
+              {teaching.stages.map((stage, stageIndex) => (
                 <div key={stage.id} className="flex items-center gap-1">
                   <div className="min-w-0 flex-1">
-                    <Row node={stage} selected={selectedId === stage.id} onSelect={onSelect} onOpenStudy={undefined} subtitle={stage.phase ? phaseLabel(stage.phase) : undefined} />
+                    <Row node={stage} selected={selectedId === stage.id} onSelect={onSelect} onOpenStudy={undefined} subtitle={`#${stageIndex + 1}${stage.phase ? ` · ${phaseLabel(stage.phase)}` : ''}`} />
                   </div>
                   {onStudyStage && (
                     <button onClick={() => onStudyStage(stage.id)} title="只显示本阶段函数" aria-label={`学习阶段 ${stage.title}`} className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground">
