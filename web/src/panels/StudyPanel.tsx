@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, ChevronRight, FileText, MessageSquareText, Send, X } from 'lucide-react';
+import { CheckCircle2, ChevronRight, FileText, MessageSquareText, Send, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/icon-button';
 import { Markdown } from '../markdown';
@@ -24,6 +24,22 @@ type Props = {
   progressBusy?: boolean;
   onToggleLearned?: (node: BoardNode) => void;
 };
+
+type LessonScope = 'unit' | 'range' | 'file' | 'board';
+
+function lessonScope(lesson: Lesson, node: BoardNode): LessonScope {
+  if (lesson.target?.unit === node.id) return 'unit';
+  if (lesson.target?.board) return 'board';
+  if (node.type !== 'unit' || !node.file) return 'file';
+  const overlaps = (lesson.target?.lines || []).filter((range) => range.file === node.file
+    && range.start <= (node.endLine || node.startLine || 0) && range.end >= (node.startLine || 0));
+  const unitLines = Math.max(1, (node.endLine || node.startLine || 1) - (node.startLine || 1) + 1);
+  const narrow = overlaps.some((range) => range.end - range.start + 1 <= Math.max(80, unitLines * 3));
+  return narrow ? 'range' : 'file';
+}
+
+const SCOPE_LABEL: Record<LessonScope, string> = { unit: '本函数', range: '行范围', file: '文件级', board: '全局' };
+const SCOPE_RANK: Record<LessonScope, number> = { unit: 0, range: 1, file: 2, board: 3 };
 
 type CodeState = { file: string; start: number; lines: string[]; truncated?: boolean; loading?: boolean; error?: string };
 
@@ -57,12 +73,15 @@ export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressB
   const overviewLessons = useMemo(() => lessons.filter((lesson) => lesson.target?.board), [lessons]);
   const available = useMemo(() => {
     const seen = new Set<string>();
-    return [...overviewLessons, ...nodeLessons].filter((lesson) => {
-      if (seen.has(lesson.id)) return false;
-      seen.add(lesson.id);
-      return true;
-    });
-  }, [overviewLessons, nodeLessons]);
+    return [...nodeLessons, ...overviewLessons]
+      .filter((lesson) => {
+        if (seen.has(lesson.id)) return false;
+        seen.add(lesson.id);
+        return true;
+      })
+      .sort((a, b) => SCOPE_RANK[lessonScope(a, node)] - SCOPE_RANK[lessonScope(b, node)] || (a.ts || 0) - (b.ts || 0));
+  }, [nodeLessons, overviewLessons, node]);
+  const hasUnitLesson = available.some((lesson) => lessonScope(lesson, node) === 'unit');
 
   const file = node.file || nodeLessons.find((lesson) => lesson.target?.file)?.target.file
     || nodeLessons.flatMap((lesson) => lesson.target?.lines || [])[0]?.file || null;
@@ -77,11 +96,18 @@ export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressB
     ? { start: node.startLine, end: node.endLine || node.startLine }
     : null;
   const [selection, setSelection] = useState(unitRange);
-  useEffect(() => setSelection(unitRange), [node.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [showWholeFile, setShowWholeFile] = useState(false);
+  useEffect(() => { setSelection(unitRange); setShowWholeFile(false); }, [node.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const displayLines = useMemo(() => {
+    if (!code) return [];
+    return code.lines
+      .map((text, index) => ({ lineNo: code.start + index, text }))
+      .filter((item) => showWholeFile || !unitRange || (item.lineNo >= unitRange.start && item.lineNo <= unitRange.end));
+  }, [code, showWholeFile, unitRange?.start, unitRange?.end]);
 
   const [tab, setTab] = useState<TabId>('split');
   const [activeLessonId, setActiveLessonId] = useState<string | null>(available[0]?.id || null);
-  useEffect(() => { setActiveLessonId(available[0]?.id || null); }, [node.id, available.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setActiveLessonId(available[0]?.id || null); }, [node.id, available[0]?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const activeLesson = available.find((lesson) => lesson.id === activeLessonId) || available[0] || null;
 
   const requests = values(snapshot.requests).filter((request) => request.unitId === node.id
@@ -95,8 +121,8 @@ export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressB
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
-  const submit = async () => {
-    if (!question.trim() || !snapshot.requestToken) return;
+  const sendQuestion = async (text: string) => {
+    if (!text.trim() || !snapshot.requestToken) return false;
     setSending(true);
     setError(null);
     try {
@@ -107,7 +133,7 @@ export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressB
           'x-blackboard-request': snapshot.requestToken,
         },
         body: JSON.stringify({
-          question: question.trim(),
+          question: text.trim(),
           unitId: node.type === 'unit' ? node.id : undefined,
           file: node.type === 'unit' ? undefined : file || undefined,
           startLine: selection?.start,
@@ -117,12 +143,26 @@ export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressB
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.detail || body.error || `HTTP ${response.status}`);
       setNotice(`已记录提问 ${body.request.id}，Agent 会在 digest/context 里看到它。`);
-      setQuestion('');
+      return true;
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : '提交失败');
+      return false;
     } finally {
       setSending(false);
     }
+  };
+
+  const submit = async () => {
+    const text = question.trim();
+    if (!text) return;
+    const ok = await sendQuestion(text);
+    if (ok) setQuestion('');
+  };
+
+  const requestUnitLesson = async () => {
+    if (node.type !== 'unit') return;
+    const target = `${node.symbol || node.title || node.id}（unit ${node.id}，${node.file || '无文件'}:${node.startLine || '?'}-${node.endLine || '?'}）`;
+    await sendQuestion(`请只针对当前函数 ${target} 生成详细讲解，并用 teach import 写入 target.unit="${node.id}" 的 lesson；不要使用覆盖整个文件的 target.lines。讲解要落到本函数的控制流、关键变量和它在利用链里的作用。`);
   };
 
   // Jump the code pane to the unit's first line when it opens; manual selection
@@ -134,6 +174,7 @@ export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressB
   }, [code?.file, code?.lines.length, node.id, tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pickLine = (line: number, shift: boolean) => {
+    if (unitRange && (line < unitRange.start || line > unitRange.end)) setShowWholeFile(true);
     setSelection((current) => (shift && current
       ? { start: Math.min(current.start, line), end: Math.max(current.start, line) }
       : { start: line, end: line }));
@@ -203,15 +244,22 @@ export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressB
       <div className={`min-h-0 flex-1 ${tab === 'ask' ? 'overflow-y-auto' : 'grid grid-cols-1 overflow-y-auto lg:grid-cols-2 lg:overflow-hidden'}`}>
         {tab !== 'ask' && (
           <div ref={scrollRef} className="min-h-0 p-2 lg:overflow-y-auto">
-            <h4 className="m-0 mb-1.5 px-1 text-[11px] font-medium text-muted-foreground">代码</h4>
+            <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+              <h4 className="m-0 text-[11px] font-medium text-muted-foreground">代码</h4>
+              {unitRange && code && !code.loading && !code.error && (
+                <div className="flex items-center gap-1 rounded-md border p-0.5 text-[10px]">
+                  <button onClick={() => setShowWholeFile(false)} className={`rounded px-1.5 py-0.5 ${!showWholeFile ? 'bg-secondary font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>当前函数</button>
+                  <button onClick={() => setShowWholeFile(true)} className={`rounded px-1.5 py-0.5 ${showWholeFile ? 'bg-secondary font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>整文件</button>
+                </div>
+              )}
+            </div>
             {!file && <p className="m-0 px-2 py-6 text-xs text-muted-foreground">这个节点没有代码锚点。选中一个代码单元，或先用 <code className="font-mono">blackboard code import</code> 导入代码。</p>}
             {file && code?.loading && <p className="m-0 px-2 py-6 text-xs text-muted-foreground">读取代码…</p>}
             {file && code?.error && <p className="m-0 px-2 py-6 text-xs text-destructive">代码读取失败：{code.error}</p>}
             {file && code && !code.loading && !code.error && (
               <>
                 <div className="rounded-lg border bg-secondary/40 py-1 font-mono text-[11.5px] leading-[19px]">
-                  {code.lines.map((text, index) => {
-                    const lineNo = code.start + index;
+                  {displayLines.map(({ lineNo, text }) => {
                     const lineNotes = notes.get(lineNo) || [];
                     const selected = selection ? lineNo >= selection.start && lineNo <= selection.end : false;
                     return (
@@ -230,7 +278,7 @@ export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressB
                   })}
                 </div>
                 <p className="m-0 mt-2 px-1 text-[11px] text-muted-foreground">
-                  {selection ? `已选 ${selection.start}-${selection.end} 行` : '点击行号选择范围'} · Shift 点击扩展 · {code.truncated ? '文件较长已截断' : `${code.lines.length} 行`}
+                  {selection ? `已选 ${selection.start}-${selection.end} 行` : '点击行号选择范围'} · Shift 点击扩展 · {unitRange && !showWholeFile ? `当前函数 ${unitRange.start}-${unitRange.end}` : code.truncated ? '文件较长已截断' : `${code.lines.length} 行`}
                 </p>
                 {file && notes.size > 0 && (
                   <div className="mt-3">
@@ -256,9 +304,26 @@ export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressB
           <div className="min-h-0 border-t p-3 lg:overflow-y-auto lg:border-l lg:border-t-0">
             <h4 className="m-0 mb-1.5 px-1 text-[11px] font-medium text-muted-foreground">讲解</h4>
             {!available.length && (
-              <p className="m-0 px-1 py-6 text-xs text-muted-foreground">
-                这个节点还没有讲解。导入一个 <code className="font-mono">blackboard.lesson.v1</code> JSON，或在“提问”里让 Agent 生成。
-              </p>
+              <div className="px-1 py-6">
+                <p className="m-0 text-xs text-muted-foreground">
+                  这个节点还没有讲解。导入一个 <code className="font-mono">blackboard.lesson.v1</code> JSON，或让 Agent 生成。
+                </p>
+                {node.type === 'unit' && (
+                  <Button size="sm" className="mt-3 h-7 text-[11px]" disabled={sending || staticMode} onClick={() => void requestUnitLesson()}>
+                    <Sparkles className="size-3.5" />{sending ? '提交中…' : '让 Agent 讲解本函数'}
+                  </Button>
+                )}
+              </div>
+            )}
+            {!hasUnitLesson && activeLesson && (
+              <div className="mb-3 rounded-lg border border-live/30 bg-live/5 p-2.5 text-[11px] leading-5 text-subtle">
+                当前函数还没有单独的 unit 级讲解；下面显示的是「{SCOPE_LABEL[lessonScope(activeLesson, node)]}」背景内容。
+                {node.type === 'unit' && (
+                  <Button size="sm" variant="outline" className="ml-2 h-6 px-2 text-[10.5px]" disabled={sending || staticMode} onClick={() => void requestUnitLesson()}>
+                    {sending ? '提交中…' : '让 Agent 讲解本函数'}
+                  </Button>
+                )}
+              </div>
             )}
             {available.length > 1 && (
               <div className="mb-3 flex flex-wrap gap-1.5">
@@ -269,12 +334,12 @@ export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressB
                     aria-pressed={activeLesson?.id === lesson.id}
                     className={`inline-flex h-7 items-center gap-1 rounded-md border px-2 text-[11px] transition-colors ${activeLesson?.id === lesson.id ? 'border-foreground bg-accent font-medium' : 'text-subtle hover:border-strong'}`}
                   >
-                    {lessonLevelLabel(lesson.level)} · {lesson.title}
+                    {SCOPE_LABEL[lessonScope(lesson, node)]} · {lessonLevelLabel(lesson.level)} · {lesson.title}
                   </button>
                 ))}
               </div>
             )}
-            {activeLesson && <LessonView lesson={activeLesson} onPickLine={pickLine} />}
+            {activeLesson && <LessonView lesson={activeLesson} scope={lessonScope(activeLesson, node)} onPickLine={pickLine} />}
           </div>
         )}
 
@@ -330,11 +395,12 @@ export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressB
   );
 }
 
-function LessonView({ lesson, onPickLine }: { lesson: Lesson; onPickLine: (line: number, shift: boolean) => void }) {
+function LessonView({ lesson, scope, onPickLine }: { lesson: Lesson; scope: LessonScope; onPickLine: (line: number, shift: boolean) => void }) {
   return (
     <article>
       <h3 className="m-0 text-[15px] font-semibold leading-snug">{lesson.title}</h3>
       <p className="m-0 mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-muted-foreground">
+        <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px]">{SCOPE_LABEL[scope]}</span>
         <span>{lessonLevelLabel(lesson.level)}</span>
         {lesson.difficulty && <span>· {difficultyLabel(lesson.difficulty)}</span>}
         {lesson.skill?.name && <span>· {lesson.skill.name}</span>}

@@ -221,6 +221,13 @@ blackboard chain clear                         # 清空（阶段标记 removed�
 
 接口：`GET /api/export/drawio?group=stage|file`、`GET /api/export/xmind?group=stage|file`。XMind 使用现代 JSON 格式（XMind 2020+）。
 
+## 5.0.1 函数讲解与代码范围
+
+- 选中函数时，讲解优先级为：`target.unit` 函数级 → 窄行范围 → 文件级 → 全局总览；
+- 没有函数级 lesson 时，右侧会明确标注「文件级」并提示当前函数还没有单独讲解；
+- 可点「让 Agent 讲解本函数」提交请求，Prompt 要求 Agent 写入 `target.unit`，生成后自动成为首选；
+- 代码区默认只显示当前函数行，可切「整文件」；点击文件外行内批注会自动展开整文件。
+
 ## 5.0.1 阶段教学
 
 - 单击画布上的攻击链阶段，或左栏「攻击链」行的靶心按钮，进入**阶段教学**模式。
