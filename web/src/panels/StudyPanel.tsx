@@ -68,7 +68,7 @@ function useCode(snapshot: GraphSnapshot, file: string | null) {
 }
 
 /** Code + lessons + student questions for one selected node. */
-export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressBusy = false, onToggleLearned }: Props) {
+export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressBusy = false, onToggleLearned, onAskAgent }: Props) {
   const lessons = values(snapshot.lessons);
   const nodeLessons = useMemo(() => lessonsForNode(lessons, node), [lessons, node]);
   const overviewLessons = useMemo(() => lessons.filter((lesson) => lesson.target?.board), [lessons]);
@@ -163,7 +163,13 @@ export function StudyPanel({ snapshot, node, onClose, canEdit = false, progressB
   const requestUnitLesson = async () => {
     if (node.type !== 'unit') return;
     const target = `${node.symbol || node.title || node.id}（unit ${node.id}，${node.file || '无文件'}:${node.startLine || '?'}-${node.endLine || '?'}）`;
-    await sendQuestion(`请只针对当前函数 ${target} 生成详细讲解，并用 teach import 写入 target.unit="${node.id}" 的 lesson；不要使用覆盖整个文件的 target.lines。讲解要落到本函数的控制流、关键变量和它在利用链里的作用。`);
+    const prompt = `请只针对当前函数 ${target} 生成详细讲解，并用 teach import 写入 target.unit="${node.id}" 的 lesson；不要使用覆盖整个文件的 target.lines。讲解要落到本函数的控制流、关键变量和它在利用链里的作用。`;
+    if (onAskAgent) {
+      onAskAgent(prompt);
+      setNotice('已交给右侧 Agent 对话，正在直接运行当前本地 CLI / 模型。');
+      return;
+    }
+    await sendQuestion(prompt);
   };
 
   // Jump the code pane to the unit's first line when it opens; manual selection
