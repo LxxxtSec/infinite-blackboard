@@ -23,6 +23,7 @@ type Props = {
   canEdit?: boolean;
   progressBusy?: boolean;
   onToggleLearned?: (node: BoardNode) => void;
+  onAskAgent?: (text: string) => void;
 };
 
 type LessonScope = 'unit' | 'range' | 'file' | 'board';

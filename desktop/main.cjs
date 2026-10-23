@@ -41,7 +41,7 @@ function augmentPath() {
       encoding: 'utf8', timeout: 2500, stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
   } catch { /* keep the inherited PATH */ }
-  const extra = [login, current, '/opt/homebrew/bin', '/usr/local/bin', path.join(os.homedir(), '.local', 'bin'), path.join(os.homedir(), 'bin')];
+  const extra = [login, current, '/opt/homebrew/bin', '/usr/local/bin', path.join(os.homedir(), '.local', 'bin'), path.join(os.homedir(), '.bun', 'bin'), path.join(os.homedir(), 'bin')];
   process.env.PATH = [...new Set(extra.filter(Boolean).join(':').split(':').filter(Boolean))].join(path.delimiter);
 }
 

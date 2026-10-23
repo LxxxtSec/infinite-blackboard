@@ -915,7 +915,7 @@ function Workspace() {
           <p className="sr-only" role="status" aria-live="polite">{selected ? `已选中${typeLabelOf(selected.type)}：${selected.title}` : ''}</p>
 
           {selected && <Inspector node={selected} edges={allEdges} byId={byId} lessons={selectedLessons} onClose={() => setSelectedId(null)} onFocus={focusNode} onOpenStudy={setStudyId} onCopyLink={isStatic ? undefined : copyNodeLink} linkCopied={linkCopied} canEdit={!isStatic} progressBusy={progressBusy === selected.id} onToggleLearned={toggleLearned} locked={lockId === selected?.id} onToggleLock={() => setLockId((current) => current === selected?.id ? null : selected?.id || null)} onStudyStage={studyStage} />}
-          {studyNode && <StudyPanel snapshot={snapshot} node={studyNode} onClose={() => { setStudyId(null); studyRef.current = null; }} canEdit={!isStatic} progressBusy={progressBusy === studyNode.id} onToggleLearned={toggleLearned} />}
+          {studyNode && <StudyPanel snapshot={snapshot} node={studyNode} onClose={() => { setStudyId(null); studyRef.current = null; }} canEdit={!isStatic} progressBusy={progressBusy === studyNode.id} onToggleLearned={toggleLearned} onAskAgent={(text) => { setChatOpen(true); setAnalysisPrompt({ id: Date.now(), text }); }} />}
           </div>
         </main>
 

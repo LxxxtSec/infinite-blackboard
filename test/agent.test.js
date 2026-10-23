@@ -7,10 +7,15 @@ import http from 'node:http';
 
 import {
   defaultAgentConfig, saveAgentConfig, loadAgentConfig, publicAgentConfig,
-  createJsonlParser, runCli, runOpenAI, buildAgentPrompt, quoteCliPrompt,
+  createJsonlParser, runCli, runOpenAI, buildAgentPrompt, quoteCliPrompt, CLI_PRESETS,
 } from '../lib/agent.js';
 import { ensure, replay, stats } from '../lib/store.js';
 import { startServer } from '../lib/server.js';
+
+test('OMP preset is available and uses the non-interactive JSON mode', () => {
+  assert.match(CLI_PRESETS.omp, /^omp -p --mode json/);
+  assert.match(CLI_PRESETS.omp, /\{prompt\}$/);
+});
 
 test('CLI prompt quoting is platform-specific', () => {
   assert.equal(quoteCliPrompt("a'b", 'linux'), "'a'\\''b'");

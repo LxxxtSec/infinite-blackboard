@@ -41,6 +41,7 @@ const CLI_PRESETS: Record<string, string> = {
   claude: 'claude -p {prompt} --output-format stream-json --verbose --include-partial-messages',
   codex: 'codex exec --json {prompt}',
   pi: 'pi -p --mode json --thinking high --no-session {prompt}',
+  omp: 'omp -p --mode json --thinking high --no-session {prompt}',
 };
 
 export function AgentChat({ snapshot, selected, canEdit, width, injectedPrompt, onInjected, onClose, onFocus }: Props) {
@@ -351,7 +352,7 @@ export function AgentChat({ snapshot, selected, canEdit, width, injectedPrompt, 
                 )}
                 {live.status === 'done' && !live.thinking && (
                   <p className="m-0 mt-1 text-[10.5px] leading-4 text-muted-foreground">
-                    本次没有思考输出：模型/CLI 没有返回 reasoning。Pi 需要命令里带 <code className="font-mono">--mode json --thinking high</code>，并且模型支持 reasoning（`pi --list-models` 的 thinking 列）。
+                    本次没有思考输出：模型/CLI 没有返回 reasoning。Pi/OMP 需要命令里带 <code className="font-mono">--mode json --thinking high</code>，并且模型支持 reasoning（`pi --list-models` 的 thinking 列）。
                   </p>
                 )}
                 {live.error && <p className="m-0 mt-1 text-[11.5px] text-destructive">{live.error}</p>}
@@ -546,7 +547,7 @@ function SettingsDialog({ open, config, onClose, token, onSaved }: {
             <select value={runtime} onChange={(event) => setRuntime(event.target.value as AgentConfig['runtime'])} className="h-9 rounded-md border bg-card px-2 text-[12px]">
               <option value="external">外部轮询（Claude Code / Codex 用 requests/reply）</option>
               <option value="openai">模型 API（OpenAI 兼容，流式）</option>
-              <option value="cli">本地 Agent CLI（Claude / Codex / Pi / 自定义）</option>
+              <option value="cli">本地 Agent CLI（Claude / Codex / Pi / OMP / 自定义）</option>
             </select>
           </label>
 
@@ -574,7 +575,7 @@ function SettingsDialog({ open, config, onClose, token, onSaved }: {
           {runtime === 'cli' && (
             <>
               <div className="flex flex-wrap gap-1.5">
-                {(['claude', 'codex', 'pi'] as const).map((item) => (
+                {(['claude', 'codex', 'pi', 'omp'] as const).map((item) => (
                   <Button key={item} size="sm" variant="outline" onClick={() => { setPreset(item); setCommandLine(CLI_PRESETS[item]); }}>{item}</Button>
                 ))}
               </div>

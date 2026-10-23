@@ -497,7 +497,7 @@ blackboard serve --open                       # 画布：攻击链 + 代码 + �
 - 右侧有**可收起的 Agent 对话栏**，右上角齿轮里可选三种运行方式：
   - **外部轮询**：问题写成 `request` 事件，由 Claude Code / Codex 用 `blackboard requests` / `reply` 异步回答；
   - **模型 API**：填 OpenAI 兼容的 base URL / model / key，服务端流式回答，带「思考过程」和「停止」；
-  - **本地 Agent CLI**：填命令模板（Claude / Codex / Pi / 任意 CLI，必须含 `{prompt}`），服务端 spawn 并流式展示思考/工具步骤，停止会杀掉进程组。
+  - **本地 Agent CLI**：填命令模板（Claude / Codex / Pi / OMP / 任意 CLI，必须含 `{prompt}`），服务端 spawn 并流式展示思考/工具步骤，停止会杀掉进程组。
 - 密钥只保存在本机 `.flow/agent.json`（0600），不会下发浏览器；离线导出只读。
 - 代码必须位于黑板根目录内；宏不计入覆盖率分母；离线导出的 HTML 会内嵌讲解所引用的代码。
 - 完整设计、命令、HTTP 接口与 lesson schema 见 [`docs/CODE_TEACHING.md`](docs/CODE_TEACHING.md)。
