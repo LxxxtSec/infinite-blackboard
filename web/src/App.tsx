@@ -687,11 +687,36 @@ function Workspace() {
 
   const requestAnalysis = () => {
     if (!snapshot?.requestToken || isStatic) return;
-    const text = `请分析/更新当前项目的代码。你已经在项目根目录：1) 先读取源码和 code ls；2) 给每个函数和宏用 annotate --file roles.json 写作用（宏请用 {role, detail} 对象，写清来源）；3) 按这个 PoC 的真实路径用 chain import --replace 写攻击阶段；4) 用 teach import 补讲解。黑板 CLI 路径、项目目录见上下文；没有把握的部分宁可少写，不要编造。完成后回复分析摘要。`;
+    const text = `请分析/更新当前项目的代码。你已经在项目根目录：1) 先读取源码和 code ls；2) 给每个函数和宏用 annotate --file roles.json 写作用（宏请用 {role, detail} 对象，写清来源）；3) 按这个 PoC 的真实路径用 chain import --replace 写攻击阶段；4) 用 teach import 补讲解。黑板 CLI 路径、项目目录见上下文；没有把握的部分宁可少写，不要编造。
+
+攻击阶段按「利用手法/原语」聚合，不要按单个准备动作或单个函数拆分：
+- 一个阶段 = 一个可以独立命名的技术步骤（例如 KernelSnitch、fake object、stack overlap、KASLR leak、read primitive、root、payload、cleanup）；
+- 同一技术流程里的准备、堆布局、对象喷洒、泄漏/读取要放在同一阶段；
+- 例如 KernelSnitch 阶段同时覆盖堆布局和 mm_struct 泄露，不能拆成两个阶段；
+- 目标通常 4-8 个阶段，阶段标题写技术目标，detail 写关键动作，units 列出该阶段实现函数。
+
+完成后回复分析摘要。`;
     setChatOpen(true);
     setAnalysisRequested(true);
     setAnalysisPrompt({ id: Date.now(), text });
     flash('已把分析任务交给右侧 Agent；本地 CLI 会直接开始运行');
+  };
+
+  const requestChainRegroup = () => {
+    if (!snapshot?.requestToken || isStatic) return;
+    const text = `只重组攻击链，不要改动函数作用、代码和已有讲解，也不要重新导入代码。
+
+请读取当前 chain 和代码，按「利用手法/原语」聚合阶段：
+- 一个阶段 = 一个可以独立命名的技术步骤（例如 KernelSnitch、fake object、stack overlap、KASLR leak、read primitive、root、payload、cleanup）；
+- 同一技术流程里的准备、堆布局、对象喷洒、泄漏/读取必须放在同一阶段；
+- 例如 KernelSnitch 阶段同时覆盖堆布局和 mm_struct 泄露，不要拆成两个阶段；
+- 目标通常 4-8 个阶段，避免一个函数/一个准备动作一个阶段；
+- 每个阶段标题写技术目标，detail 写关键动作，units 重新列出该阶段的实现函数。
+
+用 chain import --replace 写回，完成后回复新的阶段列表。`;
+    setChatOpen(true);
+    setAnalysisPrompt({ id: Date.now(), text });
+    flash('已把「按手法重组攻击链」交给右侧 Agent');
   };
   // NOTE: no hook here — this sits after the `if (!snapshot)` early return.
 
@@ -726,6 +751,7 @@ function Workspace() {
         canEdit={!isStatic}
         canAnalyze={!isStatic && Number(stats.units || 0) > 0}
         onAnalyze={requestAnalysis}
+        onRegroupChain={requestChainRegroup}
         currentStageId={stageStudyId || (selected?.type === 'stage' ? selected.id : null)}
       />
 

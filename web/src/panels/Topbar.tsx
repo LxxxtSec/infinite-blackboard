@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { FileText, Focus, GitBranch, Hash, ListTree, MessageSquareText, Moon, PanelLeft, Search, Sparkles, Sun, Upload } from 'lucide-react';
+import { ChevronDown, FileText, Focus, GitBranch, Hash, ListTree, MessageSquareText, Moon, PanelLeft, Search, Sparkles, Sun, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
@@ -9,6 +9,7 @@ import { BrandMark } from '../BrandMark';
 import { ActivityPopover } from './ActivityPopover';
 import { ProjectMenu } from './ProjectMenu';
 import { ExportMenu } from './ExportMenu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { Connection } from '../use-graph-stream';
 import type { Activity, ViewMode } from '../types';
 
@@ -41,6 +42,7 @@ type Props = {
   canEdit?: boolean;
   canAnalyze?: boolean;
   onAnalyze?: () => void;
+  onRegroupChain?: () => void;
   currentStageId?: string | null;
 };
 
@@ -51,7 +53,7 @@ const CONNECTION = {
 } as const;
 
 export function Topbar(props: Props) {
-  const { title, mode, onMode, theme, onTheme, connection, isStatic, sidebarOpen, onToggleSidebar, onSearch, onDigest, digestRef, activities, activityTotal, hasTeaching, coverage, openRequests, learned, units, chatOpen, onToggleChat, onManage, macroCount, onOpenMacros, requestToken, canEdit = false, canAnalyze = false, onAnalyze, currentStageId } = props;
+  const { title, mode, onMode, theme, onTheme, connection, isStatic, sidebarOpen, onToggleSidebar, onSearch, onDigest, digestRef, activities, activityTotal, hasTeaching, coverage, openRequests, learned, units, chatOpen, onToggleChat, onManage, macroCount, onOpenMacros, requestToken, canEdit = false, canAnalyze = false, onAnalyze, onRegroupChain, currentStageId } = props;
   const status = isStatic ? { label: '离线快照', dot: 'bg-strong' } : CONNECTION[connection];
   return (
     <header className="grid h-12 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-3 border-b bg-background px-3">
@@ -78,9 +80,29 @@ export function Topbar(props: Props) {
           <span title="已标记学习完毕的代码单元" className="mr-1 tabular-nums text-xs text-muted-foreground max-lg:hidden">已学 {learned || 0}/{units}</span>
         ) : null}
         {canAnalyze && (
-          <Button size="sm" variant="outline" onClick={onAnalyze} aria-label="让 Agent 分析当前项目" title="让 Agent 分析 / 重新分析当前项目">
-            <Sparkles className="size-3.5" /><span className="max-md:hidden">分析</span>
-          </Button>
+          <>
+            <Button size="sm" variant="outline" onClick={onAnalyze} aria-label="让 Agent 分析当前项目" title="让 Agent 分析 / 重新分析当前项目">
+              <Sparkles className="size-3.5" /><span className="max-md:hidden">分析</span>
+            </Button>
+            {onRegroupChain && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button size="sm" variant="outline" aria-label="更多分析操作" title="更多分析操作">
+                    <ChevronDown className="size-3.5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent side="bottom" align="end" sideOffset={8} className="w-72 p-2">
+                  <button onClick={onRegroupChain} className="flex w-full items-start gap-2 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-accent">
+                    <Sparkles className="mt-0.5 size-3.5 shrink-0 text-live" />
+                    <span>
+                      <span className="block text-[12px] font-medium">按手法重组攻击链</span>
+                      <span className="mt-0.5 block text-[10.5px] leading-4 text-muted-foreground">不重读/不改函数标注；同一手法里的堆布局、泄漏合并为一个阶段。</span>
+                    </span>
+                  </button>
+                </PopoverContent>
+              </Popover>
+            )}
+          </>
         )}
         {!isStatic && <ExportMenu currentStageId={currentStageId} />}
         <ProjectMenu token={requestToken} canEdit={Boolean(canEdit)} />
