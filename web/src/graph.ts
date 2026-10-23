@@ -137,7 +137,7 @@ export function orderedStages(nodes: BoardNode[], edges: { from: string; to: str
  * first, callers/entry last (post-order DFS over call edges). This matches the
  * board's "basic at the bottom/right" learning direction.
  */
-export function orderStageUnits(units: BoardNode[], edges: { from: string; to: string; kind: string }[]): BoardNode[] {
+export function orderStageUnits(units: BoardNode[], edges: { from: string; to: string; kind: string }[], stage?: BoardNode | null): BoardNode[] {
   const byId = new Map(units.map((unit) => [unit.id, unit]));
   const next = new Map<string, string[]>();
   const incoming = new Set<string>();
@@ -149,18 +149,39 @@ export function orderStageUnits(units: BoardNode[], edges: { from: string; to: s
   }
   const byPosition = (a: BoardNode, b: BoardNode) => String(a.file || '').localeCompare(String(b.file || '')) || Number(a.startLine || 0) - Number(b.startLine || 0);
   for (const list of next.values()) list.sort((a, b) => byPosition(byId.get(a)!, byId.get(b)!));
-  const roots = units.filter((unit) => !incoming.has(unit.id)).sort(byPosition);
+  const detail = String(stage?.detail || '');
+  const reachable = (id: string, seen = new Set<string>()): number => {
+    if (seen.has(id)) return 0;
+    seen.add(id);
+    let total = 0;
+    for (const child of next.get(id) || []) total += 1 + reachable(child, seen);
+    return total;
+  };
+  // Prefer the actual entry: named in the stage explanation, described as an
+  // entry/constructor, and reaching the most stage functions. This avoids
+  // starting on an unused utility just because it sorts first by file.
+  const entryScore = (unit: BoardNode) => {
+    const label = String(unit.symbol || unit.title || '');
+    const role = String(unit.role || '');
+    let score = reachable(unit.id) * 3 + (next.get(unit.id)?.length || 0);
+    if (label && detail.includes(label)) score += 100;
+    if (/入口|顶层|主流程|构造函数|constructor|run_|main/i.test(`${label} ${role}`)) score += 25;
+    if (/未用|未调用|未使用|调试|debug/i.test(role)) score -= 40;
+    return score;
+  };
+  const roots = units.filter((unit) => !incoming.has(unit.id))
+    .sort((a, b) => entryScore(b) - entryScore(a) || byPosition(a, b));
   const seen = new Set<string>();
   const visiting = new Set<string>();
   const order: BoardNode[] = [];
   const visit = (id: string) => {
     if (seen.has(id) || visiting.has(id)) return;
     visiting.add(id);
-    for (const child of next.get(id) || []) visit(child);
-    visiting.delete(id);
     seen.add(id);
     const node = byId.get(id);
     if (node) order.push(node);
+    for (const child of next.get(id) || []) visit(child);
+    visiting.delete(id);
   };
   for (const root of roots) visit(root.id);
   for (const unit of [...units].sort(byPosition)) visit(unit.id);

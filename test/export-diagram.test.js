@@ -44,6 +44,17 @@ test('current-stage export only contains that module', () => {
   assert.equal(xmind.content[0].rootTopic.title, '堆布局');
 });
 
+test('a unit repeated in two stages is owned by the first stage only', () => {
+  const g = graph();
+  g.nodes.st2 = { id: 'st2', type: 'stage', title: '第二阶段', phase: 'next', status: 'active' };
+  g.edges.e4 = { id: 'e4', from: 'u1', to: 'st2', kind: 'implements' };
+  g.edges.e5 = { id: 'e5', from: 'u2', to: 'st2', kind: 'implements' };
+  const modules = buildModules(g, 'stage');
+  assert.equal(modules.modules.length, 2);
+  assert.deepEqual(modules.modules.find((m) => m.id === 'st1').units.map((u) => u.id).sort(), ['u1', 'u2']);
+  assert.deepEqual(modules.modules.find((m) => m.id === 'st2').units, []);
+});
+
 test('XMind export is a zip with modern XMind JSON sheets', () => {
   const g = graph();
   const content = xmindContent(g, 'stage');

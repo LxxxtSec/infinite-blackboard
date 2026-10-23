@@ -20,6 +20,8 @@ type TeachingSection = {
   coverage?: TeachingCoverage | null;
 };
 
+type StageRef = { unit: BoardNode; stage: BoardNode };
+
 type Props = {
   current: BoardNode | null;
   openItems: BoardNode[];
@@ -38,9 +40,11 @@ type Props = {
   onOpenStudy?: (id: string) => void;
   onStudyStage?: (id: string) => void;
   stageOrder?: BoardNode[];
+  stageStudy?: BoardNode | null;
+  stageRefs?: StageRef[];
 };
 
-export function Sidebar({ current, openItems, findings, inbox, selectedId, counts, onSelect, onSearch, onShortcuts, filter, onFilter, filterOptions, results, teaching, onOpenStudy, onStudyStage, stageOrder }: Props) {
+export function Sidebar({ current, openItems, findings, inbox, selectedId, counts, onSelect, onSearch, onShortcuts, filter, onFilter, filterOptions, results, teaching, onOpenStudy, onStudyStage, stageOrder, stageStudy, stageRefs }: Props) {
   const answered = new Set((teaching?.answers || []).map((reply) => reply.requestId));
   const openRequests = (teaching?.requests || []).filter((request) => !answered.has(request.id));
   return (
@@ -86,6 +90,22 @@ export function Sidebar({ current, openItems, findings, inbox, selectedId, count
             </Section>
           )}
 
+          {stageStudy && (
+            <Section title="阶段导览" count={1} defaultOpen>
+              <div className="px-2 pb-2">
+                <p className="m-0 text-[12px] font-medium leading-5">{stageStudy.title}</p>
+                {stageStudy.phase && <p className="m-0 mt-0.5 text-[10.5px] text-muted-foreground">{phaseLabel(stageStudy.phase)}</p>}
+                {stageStudy.detail && (
+                  <p className="m-0 mt-1.5 max-h-36 overflow-y-auto whitespace-pre-wrap text-[11px] leading-5 text-subtle">{stageStudy.detail}</p>
+                )}
+                <p className="m-0 mt-1.5 text-[10.5px] leading-4 text-muted-foreground">先看这一步的整体目标，再按调用顺序遇到函数深入；不要从叶子函数倒着学。</p>
+                {stageOrder?.[0] && onOpenStudy && (
+                  <Button size="sm" className="mt-2 h-7 px-2 text-[11px]" onClick={() => onOpenStudy(stageOrder[0].id)}>从入口开始</Button>
+                )}
+              </div>
+            </Section>
+          )}
+
           {stageOrder && stageOrder.length > 0 && (
             <Section title="本阶段学习顺序" count={stageOrder.length} defaultOpen>
               {stageOrder.map((unit, index) => (
@@ -97,6 +117,24 @@ export function Sidebar({ current, openItems, findings, inbox, selectedId, count
                   onOpenStudy={onOpenStudy}
                   subtitle={`#${index + 1} · ${unit.role ? unit.role.slice(0, 24) : unit.file ? `${unit.file.split('/').pop()}:${unit.startLine}` : '函数'}`}
                 />
+              ))}
+            </Section>
+          )}
+
+          {stageRefs && stageRefs.length > 0 && (
+            <Section title="本阶段引用" count={stageRefs.length} defaultOpen>
+              {stageRefs.slice(0, 10).map(({ unit, stage }) => (
+                <div key={`${unit.id}-${stage.id}`} className="flex items-start gap-1.5 rounded-md px-2 py-1.5 text-[11px] hover:bg-accent">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-mono text-foreground" title={unit.symbol || unit.title}>{unit.symbol || unit.title || unit.id}</span>
+                    <span className="block truncate text-[10px] text-muted-foreground">这里只引用；详解在另一阶段</span>
+                  </span>
+                  {onStudyStage && (
+                    <button onClick={() => onStudyStage(stage.id)} className="max-w-[42%] shrink-0 truncate rounded border px-1.5 py-0.5 text-[10px] text-subtle hover:border-strong hover:text-foreground" title={stage.title}>
+                      去「{stage.title}」
+                    </button>
+                  )}
+                </div>
               ))}
             </Section>
           )}

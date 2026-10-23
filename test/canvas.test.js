@@ -17,7 +17,7 @@ for (const file of ['graph.js','presentation.js','canvas-state.js','types.js']) 
 fs.writeFileSync(path.join(dir,'package.json'),JSON.stringify({type:'module'}));
 fs.symlinkSync(path.join(root,'node_modules'),path.join(dir,'node_modules'),'dir');
 const { detailLevel, groupFor, focusedIds, neighborInDirection } = await import(pathToFileURL(path.join(dir,'canvas-state.js')).href);
-const { layoutOverview, project, layoutGraph, gridLayout, relationGroup, RELATION_GROUPS, hasTeachingData, orderedStages, layoutTeachingChain, layoutTeachingFiles, layoutTeachingHierarchy } = await import(pathToFileURL(dir+'/graph.js').href);
+const { layoutOverview, project, layoutGraph, gridLayout, relationGroup, RELATION_GROUPS, hasTeachingData, orderedStages, orderStageUnits, layoutTeachingChain, layoutTeachingFiles, layoutTeachingHierarchy } = await import(pathToFileURL(dir+'/graph.js').href);
 const { adaptRoute, roundedPath, routeValid } = await import(pathToFileURL(path.join(dir,'edge-route.js')).href);
 const { filterNodes, filterActive, EMPTY_FILTER } = await import(pathToFileURL(path.join(dir,'presentation.js')).href);
 const items = [
@@ -248,6 +248,21 @@ test('teaching file layout groups units into file frames and marks cross-file ca
  assert.equal(byId.get('e2').data.cross,true,'cross-file call is a cross link');
  assert.deepEqual(byId.get('e2').data.crossFile,{from:'b.c',to:'a.c'});
  assert.equal(byId.get('e2').label,'trigger','cross-file edge is labelled with the referenced function');
+});
+
+test('stage study order starts at the entry caller and walks inward',()=>{
+ const units=[
+  {id:'leaf',type:'unit',title:'leaf',symbol:'leaf',file:'c.c',kind:'function',startLine:1,endLine:2},
+  {id:'main',type:'unit',title:'main',symbol:'main',file:'a.c',kind:'function',startLine:1,endLine:5},
+  {id:'a',type:'unit',title:'a',symbol:'a',file:'b.c',kind:'function',startLine:1,endLine:2},
+  {id:'b',type:'unit',title:'b',symbol:'b',file:'b.c',kind:'function',startLine:4,endLine:5},
+ ];
+ const edges=[
+  {from:'main',to:'a',kind:'calls'},
+  {from:'main',to:'b',kind:'calls'},
+  {from:'a',to:'leaf',kind:'calls'},
+ ];
+ assert.deepEqual(orderStageUnits(units,edges).map((unit)=>unit.id),['main','a','leaf','b']);
 });
 
 test('retired nodes are hidden from every projection',()=>{

@@ -136,15 +136,32 @@ function Workspace() {
   const [edges, setEdges] = useEdgesState<Edge>([]);
   const { fitView, getNode, getNodes, setCenter } = useReactFlow<CanvasNode>();
 
+  // A unit is taught in exactly one stage: the first stage that implements it.
+  // Later stages reference it instead of repeating the whole function.
+  const stageOwnership = useMemo(() => {
+    const ownership = new Map<string, string>();
+    if (!snapshot) return ownership;
+    const nodes = values(snapshot.nodes);
+    const edges = values(snapshot.edges);
+    const stages = orderedStages(nodes.filter((node) => node.status !== 'removed'), edges);
+    for (const stage of stages) {
+      for (const edge of edges) {
+        if (edge.kind !== 'implements' || edge.to !== stage.id) continue;
+        if (!ownership.has(edge.from)) ownership.set(edge.from, stage.id);
+      }
+    }
+    return ownership;
+  }, [snapshot]);
+
   const projection = useMemo(() => {
     if (!snapshot) return null;
     const base = project(snapshot, mode, '', { onlyCode: !stageStudyId && mode === 'teaching' && (teachingLayout === 'files' || teachingLayout === 'hierarchy') });
     if (!stageStudyId) return base;
     const stage = base.nodes.find((node) => node.id === stageStudyId && node.data.item.type === 'stage');
     if (!stage) return base;
-    const unitIds = new Set(base.edges
-      .filter((edge) => (edge.data as { kind?: string } | undefined)?.kind === 'implements' && edge.target === stageStudyId)
-      .map((edge) => edge.source));
+    const unitIds = new Set([...stageOwnership.entries()]
+      .filter(([, stageId]) => stageId === stageStudyId)
+      .map(([unitId]) => unitId));
     unitIds.add(stageStudyId);
     const nodes = base.nodes.filter((node) => unitIds.has(node.id));
     const ids = new Set(nodes.map((node) => node.id));
@@ -152,13 +169,14 @@ function Workspace() {
     const ordered = orderStageUnits(
       nodes.filter((node) => node.data.item.type === 'unit').map((node) => node.data.item),
       base.edges.map((edge) => ({ from: edge.source, to: edge.target, kind: String((edge.data as { kind?: string } | undefined)?.kind || '') })),
+      stage.data.item,
     );
     const orderById = new Map(ordered.map((unit, index) => [unit.id, index + 1]));
     const withOrder = nodes.map((node) => node.data.item.type === 'unit'
       ? { ...node, data: { ...node.data, studyOrder: orderById.get(node.id) } }
       : node);
     return { ...base, nodes: withOrder, edges, hidden: 0 };
-  }, [snapshot, mode, teachingLayout, stageStudyId]);
+  }, [snapshot, mode, teachingLayout, stageStudyId, stageOwnership]);
 
   const allNodes = useMemo(() => (snapshot ? values(snapshot.nodes).filter((node) => node.status !== 'removed') : []), [snapshot]);
   const allEdges = useMemo(() => {
@@ -671,14 +689,30 @@ function Workspace() {
   const stageStudy = stageStudyId ? byId.get(stageStudyId) || null : null;
   const stageStudyUnits = stageStudy
     ? orderStageUnits(
-      allEdges.filter((edge) => edge.kind === 'implements' && edge.to === stageStudy.id)
-        .map((edge) => byId.get(edge.from)).filter((node): node is BoardNode => Boolean(node)),
+      [...stageOwnership.entries()]
+        .filter(([, stageId]) => stageId === stageStudy.id)
+        .map(([unitId]) => byId.get(unitId))
+        .filter((node): node is BoardNode => Boolean(node && node.type === 'unit' && node.status !== 'removed' && node.kind !== 'macro')),
       allEdges,
+      stageStudy,
     )
     : [];
   const stageStudyIndex = stageStudy && teaching ? teaching.stages.findIndex((stage) => stage.id === stageStudy.id) : -1;
   const previousStage = stageStudyIndex > 0 ? teaching?.stages[stageStudyIndex - 1] : null;
   const nextStage = stageStudyIndex >= 0 && teaching && stageStudyIndex < teaching.stages.length - 1 ? teaching.stages[stageStudyIndex + 1] : null;
+  const stageStudyIds = new Set(stageStudyUnits.map((unit) => unit.id));
+  const stageRefs = stageStudy
+    ? [...new Set(allEdges
+      .filter((edge) => edge.kind === 'calls' && stageStudyIds.has(edge.from) && !stageStudyIds.has(edge.to))
+      .map((edge) => edge.to))]
+      .map((id) => byId.get(id))
+      .filter((unit): unit is BoardNode => Boolean(unit && unit.type === 'unit' && unit.status !== 'removed' && unit.kind !== 'macro'))
+      .map((unit) => ({
+        unit,
+        stage: teaching?.stages.find((stage) => stage.id === stageOwnership.get(unit.id)) || null,
+      }))
+      .filter((ref): ref is { unit: BoardNode; stage: BoardNode } => Boolean(ref.stage))
+    : [];
   const requestMacroNotes = (missing: BoardNode[]) => {
     if (!snapshot?.requestToken || isStatic || !missing.length) return;
     const list = missing.slice(0, 120).map((macro) => `${macro.id} ${macro.symbol || macro.title} (${macro.file}:${macro.startLine})`).join('\n');
@@ -692,12 +726,11 @@ function Workspace() {
     if (!snapshot?.requestToken || isStatic) return;
     const text = `请分析/更新当前项目的代码。你已经在项目根目录：1) 先读取源码和 code ls；2) 给每个函数和宏用 annotate --file roles.json 写作用（宏请用 {role, detail} 对象，写清来源）；3) 按这个 PoC 的真实路径用 chain import --replace 写攻击阶段；4) 用 teach import 补讲解。黑板 CLI 路径、项目目录见上下文；没有把握的部分宁可少写，不要编造。
 
-攻击阶段按「利用手法/原语」聚合，不要按单个准备动作或单个函数拆分：
-- 一个阶段 = 一个可以独立命名的技术步骤（例如 KernelSnitch、fake object、stack overlap、KASLR leak、read primitive、root、payload、cleanup）；
-- 同一技术流程里的准备、堆布局、对象喷洒、泄漏/读取要放在同一阶段；
-- 例如 KernelSnitch 阶段同时覆盖堆布局和 mm_struct 泄露，不能拆成两个阶段；
-- 目标通常 4-8 个阶段，阶段标题写技术目标，detail 写关键动作，units 列出该阶段实现函数；
-- 每个代码单元只归入一个主阶段，禁止同一函数出现在多个阶段，共享 helper 归到首次出现且最相关的阶段。
+攻击阶段按「利用手法/原语」聚合，适用于任意 PoC，不要依赖当前项目的专有名字：
+- 一个阶段 = 一个可以独立命名的技术目标；同一目标里的准备、布局、对象构造、泄漏、读取、写入等子动作放在一起，不按单个函数/文件/动作拆；
+- 每个代码单元只挂一个主阶段，禁止同一函数重复出现在多个阶段；被其他阶段复用的 helper 只在一个主阶段 implements，复用阶段在 detail 里写「引用：函数名 → 阶段 X 详解」；
+- 阶段顺序按实际执行/依赖链路，阶段数量由 PoC 决定，不套固定步数；阶段 detail 先写整体目标和输入输出，再按入口/调用者到被调用者列关键动作；
+- 不要用某一类 PoC 的术语限制其他 PoC；阶段标题来自代码事实。
 
 完成后回复分析摘要。`;
     setChatOpen(true);
@@ -710,13 +743,12 @@ function Workspace() {
     if (!snapshot?.requestToken || isStatic) return;
     const text = `只重组攻击链，不要改动函数作用、代码和已有讲解，也不要重新导入代码。
 
-请读取当前 chain 和代码，按「利用手法/原语」聚合阶段：
-- 一个阶段 = 一个可以独立命名的技术步骤（例如 KernelSnitch、fake object、stack overlap、KASLR leak、read primitive、root、payload、cleanup）；
-- 同一技术流程里的准备、堆布局、对象喷洒、泄漏/读取必须放在同一阶段；
-- 例如 KernelSnitch 阶段同时覆盖堆布局和 mm_struct 泄露，不要拆成两个阶段；
-- 目标通常 4-8 个阶段，避免一个函数/一个准备动作一个阶段；
-- 每个阶段标题写技术目标，detail 写关键动作，units 重新列出该阶段的实现函数；
-- 每个代码单元只归入一个主阶段，禁止同一函数出现在多个阶段，共享 helper 归到首次出现且最相关的阶段。
+请读取当前 chain 和代码，按「利用手法/原语」聚合阶段，规则适用于任意 PoC：
+- 一个阶段 = 一个可以独立命名的技术目标；同一目标里的准备、布局、对象构造、泄漏、读取、写入等子动作放在一起；
+- 每个代码单元只挂一个主阶段，禁止同一函数重复出现在多个阶段；被其他阶段复用的 helper 只在一个主阶段 implements，复用阶段在 detail 里写「引用：函数名 → 阶段 X 详解」；
+- 阶段顺序按实际执行/依赖链路，阶段数量由 PoC 决定，不套固定步数；
+- 每个阶段标题写技术目标，detail 先写整体目标和输入输出，再按入口/调用者到被调用者列关键动作，units 重新列出该阶段的实现函数；
+- 不要用当前 PoC 的专有术语限制其他 PoC。
 
 用 chain import --replace 写回，完成后回复新的阶段列表。`;
     setChatOpen(true);
@@ -783,6 +815,8 @@ function Workspace() {
                 onOpenStudy={setStudyId}
                 onStudyStage={studyStage}
                 stageOrder={stageStudy ? stageStudyUnits : undefined}
+                stageStudy={stageStudy}
+                stageRefs={stageRefs}
               />
             </aside>
             <ResizeHandle side="left" width={sidebarWidth} min={220} max={480} defaultValue={264} onChange={setSidebarWidth} label="调整左侧导航宽度" />
@@ -795,13 +829,13 @@ function Workspace() {
               <span className="shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-muted-foreground">阶段教学</span>
               <span className="shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">{stageStudyIndex + 1}/{teaching?.stages.length || 0}</span>
               <span className="min-w-0 flex-1 truncate font-medium" title={stageStudy.title}>{stageStudy.title}</span>
-              <span className="shrink-0 text-muted-foreground max-md:hidden">{stageStudyUnits.length} 个函数 · 先基础后入口</span>
+              <span className="shrink-0 text-muted-foreground max-md:hidden">{stageStudyUnits.length} 个函数 · 先入口后细节</span>
               <div className="flex shrink-0 items-center gap-1.5">
                 {previousStage && (
                   <button onClick={() => studyStage(previousStage.id)} className="rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong" title={`上一阶段：${previousStage.title}`}>上一阶段</button>
                 )}
                 {stageStudyUnits[0] && (
-                  <button onClick={() => { setStudyId(stageStudyUnits[0].id); setSelectedId(stageStudyUnits[0].id); }} className="rounded-full bg-foreground px-2 py-0.5 text-[10.5px] text-background hover:opacity-90">从 #1 开始</button>
+                  <button onClick={() => { setStudyId(stageStudyUnits[0].id); setSelectedId(stageStudyUnits[0].id); }} className="rounded-full bg-foreground px-2 py-0.5 text-[10.5px] text-background hover:opacity-90">从入口开始</button>
                 )}
                 <button onClick={() => setSelectedId(stageStudyId)} className="rounded-full border px-2 py-0.5 text-[10.5px] hover:border-strong">详情</button>
                 {nextStage && (
