@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Infinite Blackboard",
+    "description": "Adds a Blackboard tab embedding the Infinite Blackboard teaching canvas, plus 11 native blackboard_* tools."
+  }
+}

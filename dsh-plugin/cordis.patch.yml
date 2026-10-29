@@ -1,0 +1,8 @@
+# Bundle patch for dsh-plugin-infinite-blackboard: append the plugin as a root row.
+# Profile overrides can re-target this row by id, e.g.:
+#   - id: blackboard
+#     config:
+#       cliPath: /path/to/blackboard/bin/blackboard.js
+- insert:
+    - id: infinite-blackboard
+      name: 'dsh-plugin-infinite-blackboard'

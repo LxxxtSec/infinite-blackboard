@@ -145,6 +145,25 @@ npm run serve -- --projects "%USERPROFILE%\blackboard-projects" --port 4337 --op
 - `scripts/board-*.sh` 和 `.command` 是 macOS 一键脚本，Windows 用 `start-board.cmd` 或上面的 `serve` 命令；
 - 数据默认在 `%USERPROFILE%\blackboard-projects`，可用 `PROJECTS` 环境变量覆盖。
 
+## DSH 插件
+
+仓库里的 `dsh-plugin/` 是 DeepSeek Harness 插件：把 Infinite Blackboard 作为 11 个 `blackboard_*` 原生工具接入 DSH，并在会话视图环里增加「黑板」标签（内嵌完整教学画布）。
+
+```bash
+dsh plugin --profile web add /Users/mac/Documents/myproject/infinite-blackboard/dsh-plugin
+# 首次安装后重启 dsh web，再刷新页面
+```
+
+插件默认从相邻目录解析本发行版；安装到其他位置时，用 profile patch 指定：
+
+```yaml
+- id: infinite-blackboard
+  config:
+    cliPath: /absolute/path/to/infinite-blackboard/bin/blackboard.js
+```
+
+插件不会重复实现黑板语义，所有读写仍走本仓库 CLI。详见 [`dsh-plugin/README.md`](dsh-plugin/README.md)。
+
 ## 桌面版
 
 仓库包含一个最小 Electron 外壳（`desktop/`），不重写现有 Web/服务，只负责启动、窗口、托盘和退出清理：

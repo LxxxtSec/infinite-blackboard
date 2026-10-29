@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "无限黑板",
+    "description": "在会话视图环里加一个「黑板」标签，嵌入 Infinite Blackboard 教学画布；并向模型提供 11 个 blackboard_* 原生工具。"
+  }
+}

@@ -1,0 +1,9 @@
+# macOS AppleDouble companions. This tree is often written on exFAT / SMB / USB
+# volumes, where every file gets a `._<name>` sibling; tracked ones break the
+# plugin's locale metadata scan and pollute a checkout.
+._*
+
+# Local installs and caches
+node_modules/
+.DS_Store
+*.log
